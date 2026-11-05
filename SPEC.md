@@ -30,6 +30,11 @@ a API só responde `/api/me`, `/api/auth/change-pin` e `/api/auth/logout`.
   `posts` e `post_checks` continuam no banco (migrações publicadas não mudam), mas nada as usa.
 - `pontos_dia` = soma das tarefas marcadas no snapshot do dia daquela pessoa.
 - `adesão` = pontos totais / (dias trabalhados × meta). Dia trabalhado = registro com pelo menos um check.
+- **Contagem de estoque** (`stock_counts`, `stock_count_parts`, migração 6): lista ordenada de partes, compartilhada
+  pelos funcionários. Cada parte guarda quem contou e quando, e uma anotação de onde parou (apagada quando a parte é
+  contada). A próxima parte é a primeira não contada. A contagem fecha quando todas estão contadas e reabre se uma
+  for desmarcada. Não guarda quantidades e não soma pontos. A gerência edita nome e partes sem perder o andamento
+  (parte contada não sai) e pode cancelar. Rotas em `/api/counts`.
 - Expediente de segunda a sábado (`dias_expediente = 1,2,3,4,5,6`).
 - Faixas: Ouro ≥ 95%, Prata 88–94%, Bronze 80–87%, Abaixo < 80%. Só cálculo e exibição.
 - Snapshot congelado no primeiro registro do dia. Editar o checklist cria nova versão; o dia de hoje ainda vazio
@@ -83,7 +88,10 @@ desenvolvimento), frontend em HTML, CSS e JS puros sem build, fotos no Vercel Bl
     duas tarefas de ponto foram para as tarefas de cada um. Num checklist antigo, as tarefas de ponto ficam fora dos
     dias novos e somem ao abrir o editor; o dia de hoje ainda vazio é remontado sem elas. As colunas do banco ficam.
 14. **Removido o ajuste do snapshot antigo da Nil** (`upgradeLegacyDay`) — esta base começa com banco novo.
-15. **Fuso de Manaus mantido** — a confirmar com o Erik.
+15. **Contagem de estoque fora do checklist** (05/11: "só o andamento" e "podem dividir a mesma"): é um cartão à
+    parte no dia de cada funcionário, não uma tarefa com pontos, porque atravessa dias e é dividida entre os dois.
+    Para valer pontos, mantenha uma tarefa comum de contagem no checklist.
+16. **Fuso de Manaus mantido** — a confirmar com o Erik.
 
 ## 6. Pendências
 

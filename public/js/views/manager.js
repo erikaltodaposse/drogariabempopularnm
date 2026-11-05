@@ -2,11 +2,13 @@ import { h } from '../dom.js';
 import { header } from './layout.js';
 import { checklistEditor } from './checklist-editor.js';
 import { settingsEditor } from './settings-editor.js';
+import { countsEditor } from './counts-editor.js';
 import { dashboardView } from './dashboard.js';
 
 const TABS = [
   { id: 'dashboard', label: 'Painel', view: dashboardView },
   { id: 'checklist', label: 'Tarefas', view: checklistEditor },
+  { id: 'counts', label: 'Contagens', view: countsEditor },
   { id: 'settings', label: 'Ajustes', view: settingsEditor },
 ];
 
@@ -37,7 +39,7 @@ export function managerView({ user, today, onLogout }) {
       subtitle: `Olá, ${user.name}`,
       actions: h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => (!guard || guard()) && onLogout() }, 'Sair'),
     }),
-    h('nav', { class: 'container nav-wrap', 'aria-label': 'Áreas da gestão' }, h('div', { class: 'tabs tabs-3', role: 'tablist' }, buttons)),
+    h('nav', { class: 'container nav-wrap', 'aria-label': 'Áreas da gestão' }, h('div', { class: 'tabs tabs-4', role: 'tablist' }, buttons)),
     content,
   );
   open('dashboard');

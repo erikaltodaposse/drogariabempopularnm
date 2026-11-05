@@ -33,3 +33,10 @@ export function addDays(key, days) {
   const [y, m, d] = key.split('-').map(Number);
   return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
 }
+
+const dayMonth = new Intl.DateTimeFormat('pt-BR', { timeZone: TZ, day: '2-digit', month: '2-digit' });
+
+/** "26/10 às 16:00" a partir de um ISO gravado pelo servidor. */
+export function formatWhen(iso) {
+  return iso ? `${dayMonth.format(new Date(iso))} às ${hourMinute.format(new Date(iso))}` : '';
+}

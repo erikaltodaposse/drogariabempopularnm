@@ -13,7 +13,7 @@ export const DEFAULT_SETTINGS = {
   ponto_exige_nfc: '0',
   // Entra no fim de todo prompt de imagem do roteiro, para as artes saírem com a mesma cara.
   estilo_marca:
-    'Estilo Drogaria Bem Popular: foto limpa e bem iluminada, fundo branco com detalhes em verde e amarelo, ' +
+    'Estilo Drogaria Bem Popular: foto limpa e bem iluminada, fundo branco com detalhes em vermelho, amarelo e verde, ' +
     'produto em destaque, sem pessoas, sem texto escrito na imagem, formato vertical 4:5.',
 };
 

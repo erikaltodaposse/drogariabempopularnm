@@ -5,9 +5,9 @@ import { h } from './dom.js';
 const NS = 'http://www.w3.org/2000/svg';
 
 export const CHART_COLORS = {
-  good: '#0F8A47', // verde da marca: o que foi feito / bateu a meta
-  rest: '#A9B8B0', // cinza-esverdeado: o que faltou
-  onTime: '#1F6FB2',
+  good: '#2E7D32', // verde da cruz: o que foi feito / bateu a meta
+  rest: '#B5ABA4', // cinza: o que faltou
+  onTime: '#1E3A8A',
   late: '#E07A1F',
 };
 

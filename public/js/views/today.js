@@ -57,7 +57,7 @@ function progressRing(earned, meta) {
   grad.setAttribute('y1', '0');
   grad.setAttribute('x2', '1');
   grad.setAttribute('y2', '1');
-  for (const [offset, color] of [['0', '#8ED6AA'], ['0.5', '#16A157'], ['1', '#0A6B39']]) {
+  for (const [offset, color] of [['0', '#FFC20E'], ['0.5', '#4CB848'], ['1', '#2E7D32']]) {
     const stop = document.createElementNS(ns, 'stop');
     stop.setAttribute('offset', offset);
     stop.setAttribute('stop-color', color);

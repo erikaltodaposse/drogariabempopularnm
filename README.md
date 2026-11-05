@@ -22,9 +22,10 @@ dois funcionários e tarefas com responsável.
 - **Equipe.** Em Gestão → Ajustes → Funcionários, a gerência troca o nome de cada um e define um PIN
   provisório quando alguém esquece o seu.
 
-> Cores e logo são **provisórias** (verde e amarelo de farmácia, cruz com coração). Para trocar, edite as
-> variáveis no topo de `public/css/app.css` e substitua `public/img/logo.svg`, `favicon.png` e
-> `apple-touch-icon.png`.
+> Cores tiradas da logo da drogaria: vermelho da marca no cabeçalho e nos botões, verde para o que foi feito,
+> amarelo e azul nos detalhes. A logo completa (`public/img/logo-drogaria.jpg`) aparece na tela de entrada; o
+> ícone do cabeçalho e do navegador (`logo.svg`, `favicon.png`, `apple-touch-icon.png`) é a cruz da logo.
+> Para ajustar, edite as variáveis no topo de `public/css/app.css`.
 
 ## Requisitos
 

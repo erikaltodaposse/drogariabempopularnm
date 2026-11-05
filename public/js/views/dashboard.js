@@ -25,7 +25,7 @@ function bar(points, meta) {
 }
 
 // Cor de cada pessoa nos comparativos. O nome sempre aparece junto: a cor não é a única pista.
-const PERSON_COLORS = ['#0F8A47', '#9A6A00', '#1F6FB2', '#8A3FB2'];
+const PERSON_COLORS = ['#1E3A8A', '#2E7D32', '#B00000', '#8A3FB2'];
 
 export function dashboardView({ today }) {
   let period = '7';

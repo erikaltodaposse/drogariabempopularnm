@@ -3,6 +3,7 @@ import { h, fill, showError } from '../dom.js';
 import { formatDateKey, formatTime } from '../format.js';
 import { header } from './layout.js';
 import { compressPhoto } from '../photo.js';
+import { stockCountsSection } from './stock-count.js';
 
 const AUTO_LABEL = {
   close: 'Marcada ao fechar o dia',
@@ -97,6 +98,8 @@ export function todayView({ user, date, onLogout }) {
     fileInput.click();
   }
 
+  // Criada uma vez: atualiza sozinha e não pisca quando o resto do dia é redesenhado.
+  const counts = stockCountsSection();
   const error = h('p', { class: 'alert alert-error', role: 'alert', hidden: true });
   const body = h('div', { class: 'container' }, h('p', { class: 'boot' }, 'Carregando o dia…'));
   const root = h(
@@ -290,6 +293,7 @@ export function todayView({ user, date, onLogout }) {
       status,
       fileInput,
       shiftCard(),
+      counts,
       ...day.sections.map((section, i) =>
         h(
           'section',

@@ -5,6 +5,7 @@ import { sendError } from './http.js';
 import { authRouter, meRouter } from './routes/auth.js';
 import { managerRouter } from './routes/manager.js';
 import { dayRouter } from './routes/day.js';
+import { countsRouter } from './routes/counts.js';
 import { diskPhotoStore, blobPhotoStore } from './lib/photos.js';
 
 /**
@@ -48,6 +49,7 @@ export function createApp({
   app.use('/api/me', meRouter());
   app.use('/api/day', dayRouter());
   app.use('/api/manager', managerRouter());
+  app.use('/api/counts', countsRouter());
   app.use('/api', (req, res) => sendError(res, 404, 'not_found', 'Rota não encontrada.'));
 
   app.use(express.static(publicDir, { index: 'index.html' }));

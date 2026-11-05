@@ -23,6 +23,10 @@ dois funcionários e tarefas com responsável.
   de hoje, adesão e faixa de bônus, tarefas feitas, pontualidade, faltas e a tarefa que mais esquece, com
   barras comparando os dois. Abaixo, "Desempenho de …" abre o detalhe de uma pessoa: gráficos, ranking de
   falhas, histórico com fotos e planilha.
+- **Contagem de estoque.** Em Gestão → Contagens, a gerência cria uma contagem com as partes do estoque (uma por
+  linha, na ordem de contagem). Ela aparece no dia dos dois funcionários: cada um marca a parte que terminou e, se
+  parar no meio, anota onde parou. No dia seguinte, quem abrir o app vê "Continue de: …" com a anotação. Guarda só o
+  andamento (não as quantidades) e fecha sozinha quando todas as partes estão contadas.
 - **Equipe.** Em Gestão → Ajustes → Funcionários, a gerência troca o nome de cada um e define um PIN
   provisório quando alguém esquece o seu.
 

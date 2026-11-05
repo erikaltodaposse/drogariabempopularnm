@@ -110,15 +110,17 @@ h1, h2, h3 { font-family: var(--sans); font-weight: 800; line-height: 1.2; margi
 .nav-wrap + .container { margin-top: 16px; }
 .nav-wrap .tab[aria-selected="true"] { background: var(--grad); color: var(--white); }
 .tabs-3 { grid-template-columns: repeat(3, 1fr); }
+.tabs-4 { grid-template-columns: repeat(4, 1fr); }
+.tabs-4 .tab { padding: 0 4px; font-size: 0.92rem; }
 
 /* ---------- Formulários ---------- */
 .field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
 .field label { font-weight: 700; font-size: 0.95rem; }
-.field input, .field textarea, .field select, .edit-task textarea {
+.field input, .field textarea, .field select, .edit-task textarea, .part-note input {
   width: 100%; min-height: 48px; padding: 10px 16px; font: inherit; font-size: 1.02rem;
   border: 2px solid var(--line); border-radius: 16px; background: var(--paper-50); color: var(--text);
 }
-.field input:focus, .field textarea:focus, .field select:focus, .edit-task textarea:focus { border-color: var(--brand-500); background: var(--white); outline: none; }
+.field input:focus, .field textarea:focus, .field select:focus, .edit-task textarea:focus, .part-note input:focus { border-color: var(--brand-500); background: var(--white); outline: none; }
 .field input.pin { letter-spacing: 0.6em; text-align: center; font-size: 1.5rem; font-weight: 800; }
 .field-hint { font-size: 0.85rem; color: var(--muted-strong); margin: 0; }
 
@@ -361,3 +363,18 @@ a.btn { text-decoration: none; }
 .team-list > li { display: block; padding: 12px 0; border-bottom: 1px solid var(--line); }
 .team-list > li:last-child { border-bottom: 0; }
 .team-list .btn { margin-top: 8px; }
+
+/* ---------- Contagem de estoque ---------- */
+.counts .card { margin-top: 16px; }
+.count-next { margin: 8px 0 4px; }
+.tag-next { background: #E3F5E2; color: var(--leaf-700); }
+.part-note { margin: 0 0 12px 40px; font-size: 0.95rem; }
+.part-note label { display: block; font-weight: 700; margin-bottom: 4px; }
+.part-note input { width: 100%; margin-bottom: 8px; }
+.link-btn.inline { margin: 0; min-height: 0; }
+.part-note.flush { margin-left: 0; }
+.count-done summary { cursor: pointer; font-weight: 700; color: var(--muted-strong); min-height: 44px; display: flex; align-items: center; }
+.count-list { list-style: none; padding: 0; margin: 8px 0 0; }
+.count-list > li + li { margin-top: 12px; }
+
+.section-title { font-size: 1.15rem; color: var(--brand-700); margin: 4px 4px 10px; }

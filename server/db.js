@@ -164,6 +164,30 @@ const MIGRATIONS = [
   `
   ALTER TABLE checklist_tasks ADD COLUMN assignee INTEGER REFERENCES users(id);
   `,
+  // Contagem de estoque que atravessa dias: a lista de partes guarda quem contou e onde parou.
+  `
+  CREATE TABLE stock_counts (
+    id INTEGER PRIMARY KEY,
+    title TEXT NOT NULL,
+    created_by INTEGER REFERENCES users(id),
+    created_at TEXT NOT NULL,
+    closed_at TEXT,
+    cancelled_at TEXT
+  );
+
+  CREATE TABLE stock_count_parts (
+    id INTEGER PRIMARY KEY,
+    count_id INTEGER NOT NULL REFERENCES stock_counts(id),
+    position INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    done_at TEXT,
+    done_by INTEGER REFERENCES users(id),
+    note TEXT,
+    note_at TEXT,
+    note_by INTEGER REFERENCES users(id)
+  );
+  CREATE INDEX idx_stock_count_parts_count ON stock_count_parts(count_id, position);
+  `,
 ];
 
 /**

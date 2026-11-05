@@ -6,7 +6,6 @@ export const at = (date, hhmm) => new Date(`${date}T${hhmm}:00-04:00`);
 
 /**
  * Simula um dia inteiro da funcionária, pulando as tarefas cujo texto começa com algum item de `skip`.
- * `post:HH:MM` em `skip` pula só a postagem daquele horário.
  */
 async function workDay(agent, clock, date, { skip = [], checkout = '18:05', close = true } = {}) {
   clock.now = at(date, '08:00');
@@ -14,12 +13,7 @@ async function workDay(agent, clock, date, { skip = [], checkout = '18:05', clos
   const tasks = res.body.day.sections.flatMap((s) => s.tasks).filter((t) => !t.auto);
   for (const task of tasks) {
     if (skip.some((prefix) => task.text.startsWith(prefix))) continue;
-    if (task.posts?.length) {
-      for (const post of task.posts) {
-        if (skip.includes(`post:${post.time}`)) continue;
-        await agent.put(`/api/day/${date}/posts/${post.id}`).expect(200);
-      }
-    } else if (task.requires_photo) {
+    if (task.requires_photo) {
       await agent.post(`/api/day/${date}/tasks/${task.id}/photo`).attach('photo', FAKE_JPEG, { filename: 'f.jpg', contentType: 'image/jpeg' }).expect(200);
     } else {
       await agent.put(`/api/day/${date}/tasks/${task.id}`).expect(200);
@@ -39,7 +33,7 @@ export async function scenario() {
   const { app, clock } = ctx;
   const employee = await employeeAgent(app, request);
   await workDay(employee, clock, '2026-10-26');
-  await workDay(employee, clock, '2026-10-27', { skip: ['Fechamento de caixa', 'post:16:30'] });
+  await workDay(employee, clock, '2026-10-27', { skip: ['Fechamento de caixa', 'Responder os clientes'] });
   await workDay(employee, clock, '2026-10-28', { skip: ['Fechamento de caixa'], checkout: '18:20', close: false });
   // Quinta 29: falta, sem registro.
   await workDay(employee, clock, '2026-10-30', { skip: ['Fechamento de caixa', 'Organizar gôndolas'] });

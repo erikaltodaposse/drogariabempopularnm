@@ -2,8 +2,8 @@ import express from 'express';
 import multer from 'multer';
 import { ah, requireAuth, requireRole, sendError } from '../http.js';
 import { isDateKey, todayKey, nowISO, weekdayOf, timeKey } from '../lib/date.js';
-import { findSnapshotTask, postsTask, isPostsDriven } from '../lib/snapshot.js';
-import { getSettings, isWorkday, getDay, ensureDay, markTask, dayView, syncPostsTask } from '../lib/checklist.js';
+import { findSnapshotTask } from '../lib/snapshot.js';
+import { getSettings, isWorkday, getDay, ensureDay, markTask, dayView } from '../lib/checklist.js';
 import { ALLOWED_TYPES, MAX_PHOTO_BYTES, sniffImageType } from '../lib/photos.js';
 import { daySummaryText, whatsappLink } from '../lib/summary.js';
 import { isNfcRequired, checkNfcToken } from '../lib/nfc.js';
@@ -179,10 +179,6 @@ export function dayRouter() {
       sendError(res, 409, 'auto_task', 'Esta tarefa é marcada pelo próprio app.');
       return null;
     }
-    if (isPostsDriven(task)) {
-      sendError(res, 409, 'posts_task', 'Esta tarefa é marcada postagem por postagem.');
-      return null;
-    }
     return task;
   }
 
@@ -229,38 +225,6 @@ export function dayRouter() {
         req.day.id, task.id, nowISO(req.app.locals.now()), ref,
       ]);
     }
-    res.json(await payload(req, req.user, req.params.date));
-  }));
-
-  // Cada postagem do roteiro é marcada à parte; com todas feitas, a tarefa de postagens fica marcada.
-  function snapshotPostOf(req, res) {
-    const task = postsTask(req.snapshot);
-    const postId = Number(req.params.postId);
-    const post = task?.posts?.find((p) => p.id === postId);
-    if (!post) {
-      sendError(res, 404, 'post_not_found', 'Esta postagem não faz parte do roteiro de hoje.');
-      return null;
-    }
-    return { task, post };
-  }
-
-  router.put('/:date/posts/:postId', writable, ah(async (req, res) => {
-    const found = snapshotPostOf(req, res);
-    if (!found) return;
-    const db = req.app.locals.db;
-    await db.run('INSERT OR IGNORE INTO post_checks (day_id, post_id, done_at) VALUES (?, ?, ?)', [
-      req.day.id, found.post.id, nowISO(req.app.locals.now()),
-    ]);
-    await syncPostsTask(db, req.day.id, found.task);
-    res.json(await payload(req, req.user, req.params.date));
-  }));
-
-  router.delete('/:date/posts/:postId', writable, ah(async (req, res) => {
-    const found = snapshotPostOf(req, res);
-    if (!found) return;
-    const db = req.app.locals.db;
-    await db.run('DELETE FROM post_checks WHERE day_id = ? AND post_id = ?', [req.day.id, found.post.id]);
-    await syncPostsTask(db, req.day.id, found.task);
     res.json(await payload(req, req.user, req.params.date));
   }));
 

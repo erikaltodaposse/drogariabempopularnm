@@ -5,33 +5,21 @@ import { failureRanking, taskKey } from '../server/lib/report.js';
 import { buildSnapshot } from '../server/lib/snapshot.js';
 
 // Pontos calculados direto no banco, pelo snapshot de cada dia, sem passar pelo código do painel.
-// A tarefa de postagens incompleta rende a parte proporcional às postagens feitas.
 async function pointsFromDb(db) {
-  const partial = await db.all(
-    `SELECT d.date, json_extract(t.value, '$.points') AS points, json_array_length(t.value, '$.posts') AS n,
-            (SELECT COUNT(*) FROM post_checks pc WHERE pc.day_id = d.id) AS done
+  return db.all(
+    `SELECT d.date, COALESCE(SUM(json_extract(t.value, '$.points')), 0) AS points
      FROM day_records d
      JOIN json_each(d.snapshot, '$.sections') s
      JOIN json_each(s.value, '$.tasks') t
-     WHERE json_array_length(t.value, '$.posts') > 0
-       AND NOT EXISTS (SELECT 1 FROM task_checks c WHERE c.day_id = d.id AND c.task_id = json_extract(t.value, '$.id'))`,
+     JOIN task_checks c ON c.day_id = d.id AND c.task_id = json_extract(t.value, '$.id')
+     GROUP BY d.date ORDER BY d.date`,
   );
-  const extra = new Map(partial.map((r) => [r.date, Math.floor((r.points * r.done) / r.n)]));
-  const rows = await db.all(
-      `SELECT d.date, COALESCE(SUM(json_extract(t.value, '$.points')), 0) AS points
-       FROM day_records d
-       JOIN json_each(d.snapshot, '$.sections') s
-       JOIN json_each(s.value, '$.tasks') t
-       JOIN task_checks c ON c.day_id = d.id AND c.task_id = json_extract(t.value, '$.id')
-       GROUP BY d.date ORDER BY d.date`,
-  );
-  return rows.map((r) => ({ ...r, points: r.points + (extra.get(r.date) ?? 0) }));
 }
 
 test('resumo do período bate com o banco', async () => {
   const { manager, db } = await scenario();
   const fromDb = await pointsFromDb(db);
-  assert.deepEqual(fromDb.map((r) => r.points), [100, 78, 75, 75, 10]);
+  assert.deepEqual(fromDb.map((r) => r.points), [100, 80, 80, 80, 10]);
 
   const res = await manager.get('/api/manager/summary?from=2026-10-26&to=2026-11-02').expect(200);
   const s = res.body.summary;
@@ -39,16 +27,16 @@ test('resumo do período bate com o banco', async () => {
   const total = closedPeriod.reduce((sum, r) => sum + r.points, 0);
   assert.equal(s.worked_days, 4);
   assert.equal(s.total_points, total);
-  assert.equal(s.total_points, 328);
-  assert.equal(s.adherence, 328 / 400);
+  assert.equal(s.total_points, 340);
+  assert.equal(s.adherence, 340 / 400);
   assert.equal(s.tier.id, 'bronze');
   assert.equal(s.bonus_value, 100);
-  assert.equal(s.average_points, 82);
+  assert.equal(s.average_points, 85);
   assert.equal(s.late_checkouts, 1);
   assert.equal(s.not_closed, 1);
   assert.equal(s.missing_workdays, 2); // quinta 29 e sábado 31
-  assert.deepEqual(s.series.map((d) => d.points), [100, 78, 75, 75]);
-  assert.deepEqual(s.tasks, { done: 30, total: 36 });
+  assert.deepEqual(s.series.map((d) => d.points), [100, 80, 80, 80]);
+  assert.deepEqual(s.tasks, { done: 34, total: 40 });
   assert.ok(s.punctuality.timed > 0);
 });
 
@@ -63,8 +51,8 @@ test('ranking aponta a tarefa mais falha', async () => {
   assert.ok(rest.every((f) => f.missed === 1));
   assert.deepEqual(rest.map((f) => f.task).sort(), [
     'Fechar o dia no app e enviar o resumo',
-    'Organizar gôndolas de higiene, beleza e perfumaria',
-    'Postagens do dia',
+    'Organizar gôndolas e vitrine de higiene, beleza e perfumaria',
+    'Responder os clientes do WhatsApp e separar encomendas',
   ]);
 });
 
@@ -73,15 +61,15 @@ test('histórico lista os dias com situação, e o filtro de período funciona',
   const all = await manager.get('/api/manager/days').expect(200);
   assert.deepEqual(all.body.days.map((d) => [d.date, d.status, d.points]), [
     ['2026-11-02', 'em_andamento', 10],
-    ['2026-10-30', 'fechado', 75],
-    ['2026-10-28', 'sem_fechamento', 75],
-    ['2026-10-27', 'fechado', 78],
+    ['2026-10-30', 'fechado', 80],
+    ['2026-10-28', 'sem_fechamento', 80],
+    ['2026-10-27', 'fechado', 80],
     ['2026-10-26', 'fechado', 100],
   ]);
   const wed = all.body.days.find((d) => d.date === '2026-10-28');
   assert.equal(wed.late_checkout, true);
-  assert.equal(wed.photos, 1);
-  assert.equal(wed.photo_tasks, 1);
+  assert.equal(wed.photos, 2);
+  assert.equal(wed.photo_tasks, 2);
 
   const week = await manager.get('/api/manager/days?from=2026-10-27&to=2026-10-28').expect(200);
   assert.equal(week.body.days.length, 2);
@@ -93,7 +81,7 @@ test('gestora abre o dia com fotos; funcionária não acessa o painel', async ()
   const { manager, employee } = await scenario();
   const day = await manager.get('/api/day/2026-10-26').expect(200);
   const withPhoto = day.body.day.sections.flatMap((s) => s.tasks).filter((t) => t.has_photo);
-  assert.equal(withPhoto.length, 1);
+  assert.equal(withPhoto.length, 2);
   await manager.get(`/api/day/2026-10-26/tasks/${withPhoto[0].id}/photo`).expect(200);
   await employee.get('/api/manager/summary').expect(403);
   await employee.get('/api/manager/failures').expect(403);

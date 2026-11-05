@@ -12,7 +12,11 @@ dois funcionários e tarefas com responsável.
 
 - **Tarefas com responsável.** Em Gestão → Tarefas, cada tarefa do checklist de cada dia da semana tem um
   responsável: um dos funcionários ou "Todos". O dia de cada pessoa mostra só as tarefas dela e as de todos.
-  Entrada, saída e fechamento do dia são sempre de todos (cada um registra o seu).
+  Entrada, saída e fechamento do dia são sempre de todos (cada um registra o seu). Os botões "Ver tarefas de"
+  filtram o editor por pessoa, e a tarefa nova adicionada com uma pessoa escolhida já nasce dela.
+- **Checklist por função.** O padrão já vem dividido: o primeiro funcionário (Jaqueline) cuida de caixa e
+  atendimento; o segundo (Bruno), farmacêutico, da geladeira, receitas e controlados, validade, recebimento e
+  estoque. "Restaurar padrão em todos os dias" volta a essa divisão de uma vez.
 - **Meta por pessoa.** A meta diária (padrão 100 pontos) vale para cada funcionário. O editor mostra quanto
   cada um soma no dia e avisa se alguém ficou abaixo da meta.
 - **Painel da equipe.** Em Gestão → Painel, o cartão "Equipe lado a lado" mostra para cada funcionário: o dia
@@ -70,7 +74,7 @@ Abra `http://localhost:3000`. Para testar no celular, use `http://IP-DA-MAQUINA:
 | `MANAGER_PASSWORD` | no seed | Senha da gerência, mínimo 8 caracteres. |
 | `MANAGER_NAME` | não | Nome exibido da gerência. Padrão `Gerência`. |
 | `EMPLOYEE_1_NAME` | não | Nome do primeiro funcionário (Jaqueline). Padrão `Funcionário 1`. |
-| `EMPLOYEE_2_NAME` | não | Nome do segundo funcionário. Padrão `Funcionário 2`. |
+| `EMPLOYEE_2_NAME` | não | Nome do segundo funcionário (Bruno). Padrão `Funcionário 2`. |
 | `TURSO_DATABASE_URL` | na Vercel | Endereço do banco no Turso (`libsql://...`). Em branco, usa o arquivo `DATA_DIR/app.db`. |
 | `TURSO_AUTH_TOKEN` | na Vercel | Token de acesso ao banco do Turso. |
 | `BLOB_STORE_ID` ou `BLOB_READ_WRITE_TOKEN` | na Vercel | Criadas sozinhas ao conectar um Vercel Blob ao projeto (a primeira usa OIDC). Sem nenhuma, as fotos ficam em `DATA_DIR/uploads`. |
@@ -84,11 +88,12 @@ Abra `http://localhost:3000`. Para testar no celular, use `http://IP-DA-MAQUINA:
 - os dois funcionários, com PINs iniciais `1234` e `5678` e troca obrigatória no primeiro acesso
   (o login é só pelo PIN, por isso os PINs nunca se repetem);
 - as configurações padrão (meta 100 por pessoa, turno 08:00–18:00, expediente de segunda a sábado);
-- o checklist padrão de 15 tarefas para cada dia da semana, já dividido: 100 pontos para cada funcionário
-  (o primeiro cuida de caixa, atendimento e postagens; o segundo de geladeira, limpeza, estoque e validade);
-- um roteiro de postagens de exemplo, com prompts que respeitam as regras de propaganda de farmácia.
+- o checklist padrão de 16 tarefas para cada dia da semana, já dividido por função: 100 pontos para cada
+  funcionário (o primeiro com caixa e atendimento; o segundo, farmacêutico, com a farmácia).
 
-Pode rodar de novo sem perder nada: o que já existe não é sobrescrito.
+Pode rodar de novo sem perder nada: o que já existe não é sobrescrito. A única exceção é um banco criado pela
+versão anterior, que tinha roteiro de postagens: enquanto nenhum dia tiver sido registrado, o seed troca aquele
+checklist pelo padrão por função.
 
 ## Banco e migrações
 
@@ -119,7 +124,7 @@ O link da etiqueta usa o domínio em que a gerência abriu o app. Em produção,
 No Painel da gerência, o cartão **Exportar** tem:
 
 - **Baixar planilha (CSV)**: um dia por linha no período escolhido, do funcionário escolhido, separado por `;`, com BOM UTF-8 (abre direto no Excel).
-- **Baixar backup (JSON)**: todos os registros, tarefas, versões do checklist, ajustes, roteiro e log de auditoria. Não inclui sessões nem os arquivos das fotos.
+- **Baixar backup (JSON)**: todos os registros, tarefas, versões do checklist, ajustes e log de auditoria. Não inclui sessões nem os arquivos das fotos.
 
 ## Restaurar um backup numa máquina limpa
 

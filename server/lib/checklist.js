@@ -1,10 +1,10 @@
 // Acesso ao banco para checklist, configurações e registros do dia.
-import { buildSnapshot, canRewriteSnapshot, postsTask, snapshotPost } from './snapshot.js';
+import { buildSnapshot, canRewriteSnapshot } from './snapshot.js';
 import { dayPoints } from './points.js';
 import { nowISO, weekdayOf, timeKey, minutesOf } from './date.js';
 
 export const CHECKOUT_TOLERANCE_MIN = 10;
-// Tarefa (ou postagem) feita mais de 15 minutos depois do horário conta como atrasada. Não perde pontos.
+// Tarefa feita mais de 15 minutos depois do horário conta como atrasada. Não perde pontos.
 export const TASK_TOLERANCE_MIN = 15;
 
 export async function getSettings(db) {
@@ -16,7 +16,6 @@ export async function getSettings(db) {
     shiftStart: raw.turno_inicio || '08:00',
     shiftEnd: raw.turno_fim || '18:00',
     storeName: raw.nome_loja || 'Drogaria Bem Popular',
-    brandStyle: raw.estilo_marca ?? '',
     workdays: (raw.dias_expediente ?? '1,2,3,4,5')
       .split(',')
       .map((d) => Number(d.trim()))
@@ -59,18 +58,10 @@ export async function loadTemplate(db, weekday) {
   };
 }
 
-/** Roteiro da data: as postagens programadas para ela ou, sem nenhuma, as do dia da semana. */
-export async function loadPostsFor(db, date) {
-  const cols = 'id, time, kind, goal, image_prompt, text_prompt';
-  const dated = await db.all(`SELECT ${cols} FROM posts WHERE date = ? AND active = 1 ORDER BY time, id`, [date]);
-  if (dated.length) return dated;
-  return db.all(`SELECT ${cols} FROM posts WHERE date IS NULL AND weekday = ? AND active = 1 ORDER BY time, id`, [weekdayOf(date)]);
-}
-
 /**
  * Salva um novo template para o dia da semana como nova versão. Dias já registrados não mudam;
  * o dia de hoje, se estiver vazio, recebe o snapshot novo (brief 7.2).
- * `data` = { cleaning_focus, sections: [{ title, subtitle, tasks: [{ text, points, requires_photo, auto, due_time, posts, assignee }] }] }.
+ * `data` = { cleaning_focus, sections: [{ title, subtitle, tasks: [{ text, points, requires_photo, auto, due_time, assignee }] }] }.
  */
 export async function createChecklistVersion(db, weekday, data, today) {
   return db.transaction(async (tx) => {
@@ -88,19 +79,18 @@ export async function createChecklistVersion(db, weekday, data, today) {
       )).lastInsertRowid;
       for (const [tIdx, task] of section.tasks.entries()) {
         await tx.run(
-          `INSERT INTO checklist_tasks (section_id, position, text, points, requires_photo, auto, due_time, posts, assignee)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [sectionId, tIdx, task.text, task.points, task.requires_photo ? 1 : 0, task.auto ?? null, task.due_time ?? null, task.posts ? 1 : 0, task.assignee ?? null],
+          `INSERT INTO checklist_tasks (section_id, position, text, points, requires_photo, auto, due_time, assignee)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          [sectionId, tIdx, task.text, task.points, task.requires_photo ? 1 : 0, task.auto ?? null, task.due_time ?? null, task.assignee ?? null],
         );
       }
     }
 
     if (weekdayOf(today) === weekday) {
       const template = await loadTemplate(tx, weekday);
-      const posts = await loadPostsFor(tx, today);
       for (const day of await tx.all('SELECT * FROM day_records WHERE date = ?', [today])) {
-        if (canRewriteSnapshot(day, await getChecks(tx, day.id), today, await getPostChecks(tx, day.id))) {
-          const snapshot = JSON.stringify(buildSnapshot(template, posts, day.user_id));
+        if (canRewriteSnapshot(day, await getChecks(tx, day.id), today)) {
+          const snapshot = JSON.stringify(buildSnapshot(template, day.user_id));
           await tx.run('UPDATE day_records SET snapshot = ? WHERE id = ?', [snapshot, day.id]);
         }
       }
@@ -117,37 +107,6 @@ export async function getChecks(db, dayId) {
   return db.all('SELECT * FROM task_checks WHERE day_id = ? ORDER BY done_at', [dayId]);
 }
 
-export async function getPostChecks(db, dayId) {
-  return db.all('SELECT * FROM post_checks WHERE day_id = ? ORDER BY done_at', [dayId]);
-}
-
-/**
- * Depois de editar o roteiro: o dia de hoje que ainda não tem nenhuma postagem marcada passa a usar o roteiro novo.
- * O resto do snapshot não muda.
- */
-export async function refreshTodayPosts(db, today) {
-  const posts = (await loadPostsFor(db, today)).map(snapshotPost);
-  for (const day of await db.all('SELECT * FROM day_records WHERE date = ? AND closed_at IS NULL', [today])) {
-    if ((await getPostChecks(db, day.id)).length) continue;
-    const snapshot = JSON.parse(day.snapshot);
-    const task = postsTask(snapshot);
-    if (!task) continue;
-    task.posts = posts;
-    await db.run('UPDATE day_records SET snapshot = ? WHERE id = ?', [JSON.stringify(snapshot), day.id]);
-  }
-}
-
-/** A tarefa de postagens fica marcada quando todas as postagens estão feitas, com o horário da última. */
-export async function syncPostsTask(db, dayId, task) {
-  const ids = new Set(task.posts.map((p) => p.id));
-  const done = (await getPostChecks(db, dayId)).filter((c) => ids.has(c.post_id));
-  if (done.length === ids.size) {
-    await markTask(db, dayId, task.id, done[done.length - 1].done_at);
-  } else {
-    await db.run('DELETE FROM task_checks WHERE day_id = ? AND task_id = ?', [dayId, task.id]);
-  }
-}
-
 /** Devolve o registro do dia, criando-o e congelando o snapshot (só com as tarefas desta pessoa) se ainda não existir. */
 export async function ensureDay(db, userId, date) {
   const existing = await getDay(db, userId, date);
@@ -157,7 +116,7 @@ export async function ensureDay(db, userId, date) {
   await db.run('INSERT OR IGNORE INTO day_records (user_id, date, snapshot, created_at) VALUES (?, ?, ?, ?)', [
     userId,
     date,
-    JSON.stringify(buildSnapshot(template, await loadPostsFor(db, date), userId)),
+    JSON.stringify(buildSnapshot(template, userId)),
     nowISO(),
   ]);
   return getDay(db, userId, date);
@@ -179,29 +138,11 @@ export function isLateDone(dueTime, doneAt) {
   return minutesOf(timeKey(new Date(doneAt))) > minutesOf(dueTime) + TASK_TOLERANCE_MIN;
 }
 
-/** Prompt de imagem com o estilo da marca no fim. */
-export function fullImagePrompt(prompt, brandStyle) {
-  if (!prompt) return null;
-  return brandStyle ? `${prompt}\n\n${brandStyle}` : prompt;
-}
-
 /** Visão do dia para a API: snapshot com estado de cada tarefa e pontos. */
 export async function dayView(db, day, settings) {
   const snapshot = JSON.parse(day.snapshot);
   const checks = await getChecks(db, day.id);
-  const postChecks = await getPostChecks(db, day.id);
   const byTask = new Map(checks.map((c) => [c.task_id, c]));
-  const byPost = new Map(postChecks.map((c) => [c.post_id, c]));
-  const postView = (post) => {
-    const check = byPost.get(post.id);
-    return {
-      ...post,
-      image_prompt_full: fullImagePrompt(post.image_prompt, settings.brandStyle),
-      done: Boolean(check),
-      done_at: check?.done_at ?? null,
-      late: isLateDone(post.time, check?.done_at),
-    };
-  };
   return {
     id: day.id,
     date: day.date,
@@ -221,10 +162,9 @@ export async function dayView(db, day, settings) {
           done_at: check?.done_at ?? null,
           late: isLateDone(task.due_time, check?.done_at),
           has_photo: Boolean(check?.photo_path),
-          ...(task.posts ? { posts: task.posts.map(postView) } : {}),
         };
       }),
     })),
-    points: { ...dayPoints(snapshot, checks.map((c) => c.task_id), postChecks.map((c) => c.post_id)), meta: settings.meta },
+    points: { ...dayPoints(snapshot, checks.map((c) => c.task_id)), meta: settings.meta },
   };
 }

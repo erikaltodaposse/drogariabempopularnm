@@ -1,5 +1,5 @@
-/* Identidade visual a partir da logo da Drogarias Bem Popular Brasil: vermelho da marca, amarelo e verde da
-   cruz, azul do detalhe e branco. O vermelho fica na moldura (cabeçalho e botões); o verde marca o que foi feito. */
+/* Identidade visual a partir da logo oficial da Drogarias Bem Popular Brasil: vermelho e preto do nome, cruz
+   amarela e verde com o círculo azul, fundo branco. O vermelho fica na moldura (cabeçalho e botões); o verde marca o que foi feito. */
 @font-face { font-family: 'Nunito'; font-weight: 400; font-display: swap; src: url('/fonts/nunito-latin-400-normal.woff2') format('woff2'); }
 @font-face { font-family: 'Nunito'; font-weight: 700; font-display: swap; src: url('/fonts/nunito-latin-700-normal.woff2') format('woff2'); }
 @font-face { font-family: 'Nunito'; font-weight: 800; font-display: swap; src: url('/fonts/nunito-latin-800-normal.woff2') format('woff2'); }
@@ -7,19 +7,19 @@
 :root {
   --brand-900: #6E0000;
   --brand-700: #B00000;
-  --brand-600: #D90000;
+  --brand-600: #E00000;
   --brand-500: #EE1C1C;
   --brand-300: #F5A3A3;
   --brand-100: #FDE8E8;
   --paper-50: #FFFAF3;
   --paper-100: #FFF3DF;
   --paper-200: #FBE5C2;
-  --sun: #FFC20E;
+  --sun: #FEDF03;
   --sun-700: #A86F00;
-  --leaf: #4CB848;
-  --leaf-700: #2E7D32;
-  --navy: #1E3A8A;
-  --text: #1E1B2E;
+  --leaf: #1FA51C;
+  --leaf-700: #037D02;
+  --navy: #0028AE;
+  --text: #141414;
   --muted: #A89A8C;
   --muted-strong: #5B4B44;
   --white: #FFFFFF;
@@ -83,7 +83,7 @@ h1, h2, h3 { font-family: var(--sans); font-weight: 800; line-height: 1.2; margi
 
 /* ---------- Login ---------- */
 .login-hero { text-align: center; padding: 28px 20px 70px; border-radius: 0 0 40px 40px; }
-.login-logo { display: block; width: min(280px, 80vw); height: auto; margin: 0 auto; border-radius: 22px; border: 3px solid rgba(255, 255, 255, 0.9); box-shadow: 0 12px 30px rgba(110, 0, 0, 0.35); }
+.login-logo { display: block; width: min(300px, 82vw); height: auto; margin: 0 auto; border-radius: 22px; background: #FFFFFF; padding: 10px 14px; border: 3px solid rgba(255, 255, 255, 0.9); box-shadow: 0 12px 30px rgba(110, 0, 0, 0.35); }
 .login-hero .brand { margin-top: 12px; font-size: 2rem; }
 .login-hero .sub { margin-top: 2px; }
 

@@ -23,7 +23,7 @@ export function loginHeader() {
   return h(
     'header',
     { class: 'header login-hero' },
-    h('img', { class: 'login-logo', src: '/img/logo-drogaria.jpg', alt: 'Drogarias Bem Popular Brasil', width: '523', height: '366' }),
+    h('img', { class: 'login-logo', src: '/img/logo-drogaria.jpg', alt: 'Drogarias Bem Popular Brasil', width: '640', height: '346' }),
     h('h1', { class: 'brand' }, 'Checkpoint'),
     h('p', { class: 'sub' }, 'Tarefas e desempenho da equipe'),
   );

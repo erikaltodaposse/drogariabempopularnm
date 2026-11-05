@@ -175,7 +175,6 @@ a.btn { text-decoration: none; }
 .times div { background: var(--paper-100); border-radius: 18px; padding: 10px 14px; }
 .times dt { font-size: 0.85rem; color: var(--muted-strong); font-weight: 700; }
 .times dd { margin: 0; font-weight: 800; font-size: 1.15rem; }
-.notice.rule { margin: 16px 0 0; }
 
 .sec-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .sec-count { flex: none; background: var(--brand-100); color: var(--brand-700); font-weight: 800; font-size: 0.85rem; padding: 2px 12px; border-radius: 999px; }

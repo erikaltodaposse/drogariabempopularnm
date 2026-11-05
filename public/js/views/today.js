@@ -290,7 +290,6 @@ export function todayView({ user, date, onLogout }) {
       status,
       fileInput,
       shiftCard(),
-      h('p', { class: 'notice rule' }, h('strong', {}, 'A drogaria nunca fica sozinha. '), 'Antes de sair, confira se o colega ou a gerência está na loja.'),
       ...day.sections.map((section, i) =>
         h(
           'section',

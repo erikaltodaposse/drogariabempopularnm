@@ -6,7 +6,7 @@ import { isLateDone } from './checklist.js';
 
 /**
  * Linhas de dia já com snapshot e checks:
- * { date, check_in_at, check_out_at, closed_at, snapshot, checks: [{task_id, done_at, photo_path}], post_checks: [{post_id, done_at}] }.
+ * { date, check_in_at, check_out_at, closed_at, snapshot, checks: [{task_id, done_at, photo_path}] }.
  */
 export async function loadDayRows(db, userId, from, to) {
   const range = 'user_id = ? AND (? IS NULL OR date >= ?) AND (? IS NULL OR date <= ?)';
@@ -17,55 +17,37 @@ export async function loadDayRows(db, userId, from, to) {
      WHERE day_id IN (SELECT id FROM day_records WHERE ${range})`,
     args,
   );
-  const postChecks = await db.all(
-    `SELECT day_id, post_id, done_at FROM post_checks
-     WHERE day_id IN (SELECT id FROM day_records WHERE ${range})`,
-    args,
-  );
-  const group = (rows, pick) => {
-    const map = new Map();
-    for (const r of rows) {
-      if (!map.has(r.day_id)) map.set(r.day_id, []);
-      map.get(r.day_id).push(pick(r));
-    }
-    return map;
-  };
-  const byDay = group(checks, (c) => ({ task_id: c.task_id, done_at: c.done_at, photo_path: c.photo_path }));
-  const postsByDay = group(postChecks, (c) => ({ post_id: c.post_id, done_at: c.done_at }));
+  const byDay = new Map();
+  for (const c of checks) {
+    if (!byDay.has(c.day_id)) byDay.set(c.day_id, []);
+    byDay.get(c.day_id).push({ task_id: c.task_id, done_at: c.done_at, photo_path: c.photo_path });
+  }
   return days.map((d) => ({
     ...d,
     snapshot: JSON.parse(d.snapshot),
     checks: byDay.get(d.id) ?? [],
-    post_checks: postsByDay.get(d.id) ?? [],
   }));
 }
 
 /** Dia que entra nos números: trabalhado (com check) e já encerrado (fechado ou anterior a hoje). */
 export function isCountable(row, today) {
-  return (row.checks.length > 0 || (row.post_checks?.length ?? 0) > 0) && (row.date < today || Boolean(row.closed_at));
+  return row.checks.length > 0 && (row.date < today || Boolean(row.closed_at));
 }
 
 export function dayStats(row) {
-  return dayPoints(row.snapshot, row.checks.map((c) => c.task_id), (row.post_checks ?? []).map((c) => c.post_id));
+  return dayPoints(row.snapshot, row.checks.map((c) => c.task_id));
 }
 
-/**
- * Pontualidade do dia: tarefas e postagens com horário que foram feitas, e quantas dentro da tolerância.
- * A tarefa de postagens não conta por si: cada postagem conta com o próprio horário.
- */
+/** Pontualidade do dia: tarefas com horário que foram feitas, e quantas dentro da tolerância. */
 export function dayPunctuality(row) {
   const doneAt = new Map(row.checks.map((c) => [c.task_id, c.done_at]));
-  const postAt = new Map((row.post_checks ?? []).map((c) => [c.post_id, c.done_at]));
   let timed = 0;
   let onTime = 0;
-  const count = (due, at) => {
-    if (!due || !at) return;
-    timed++;
-    if (!isLateDone(due, at)) onTime++;
-  };
   for (const task of snapshotTasks(row.snapshot)) {
-    if (task.posts?.length) for (const post of task.posts) count(post.time, postAt.get(post.id));
-    else count(task.due_time, doneAt.get(task.id));
+    const at = doneAt.get(task.id);
+    if (!task.due_time || !at) continue;
+    timed++;
+    if (!isLateDone(task.due_time, at)) onTime++;
   }
   return { timed, on_time: onTime };
 }

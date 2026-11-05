@@ -112,7 +112,7 @@ test('login bloqueia após 5 tentativas erradas', async () => {
 test('seed é idempotente e cria dois funcionários e o checklist de cada dia', async () => {
   const { db } = await makeApp();
   const again = await seed(db, { MANAGER_EMAIL: MANAGER.email, MANAGER_PASSWORD: MANAGER.password });
-  assert.deepEqual(again, { manager: false, employees: 0, settings: 0, checklist: false, posts: false });
+  assert.deepEqual(again, { manager: false, employees: 0, settings: 0, checklist: false, checklist_upgraded: false });
   const totals = await db.all(
       `SELECT v.weekday, SUM(t.points) AS total, COUNT(*) AS n FROM checklist_tasks t
        JOIN checklist_sections s ON s.id = t.section_id
@@ -121,7 +121,7 @@ test('seed é idempotente e cria dois funcionários e o checklist de cada dia', 
   assert.equal(totals.length, 7);
   for (const row of totals) {
     assert.equal(row.total, 170);
-    assert.equal(row.n, 15);
+    assert.equal(row.n, 16);
   }
   assert.equal((await db.get('SELECT COUNT(*) AS n FROM users')).n, 3);
   // Cada funcionário soma 100 pontos: as tarefas dele mais as sem responsável.
@@ -133,6 +133,28 @@ test('seed é idempotente e cria dois funcionários e o checklist de cada dia', 
       WHERE u.role = 'employee' GROUP BY u.id ORDER BY u.id`,
   );
   assert.deepEqual(perEmployee.map((r) => [r.name, r.total]), [['Ana', 100], ['Bruno', 100]]);
+});
+
+test('seed troca o checklist antigo com postagens pelo padrão por função, só sem dia registrado', async () => {
+  const env = { MANAGER_EMAIL: MANAGER.email, MANAGER_PASSWORD: MANAGER.password };
+  const { db } = await makeApp();
+  // Simula o banco da versão anterior: uma tarefa de postagens no checklist vigente.
+  await db.run('UPDATE checklist_tasks SET posts = 1 WHERE id = (SELECT MIN(id) FROM checklist_tasks WHERE auto IS NULL)');
+  const upgraded = await seed(db, env);
+  assert.equal(upgraded.checklist_upgraded, true);
+  const active = await db.all(
+    `SELECT t.posts FROM checklist_tasks t JOIN checklist_sections s ON s.id = t.section_id
+     JOIN checklist_versions v ON v.id = s.version_id WHERE v.active = 1`,
+  );
+  assert.equal(active.length, 16 * 7);
+  assert.ok(active.every((t) => t.posts === 0));
+
+  // Com um dia registrado, o seed não mexe mais no checklist.
+  const other = await makeApp();
+  const { app } = other;
+  await (await employeeAgent(app, request)).post(`/api/day/${MONDAY}/checkin`).expect(200);
+  await other.db.run('UPDATE checklist_tasks SET posts = 1 WHERE id = (SELECT MIN(id) FROM checklist_tasks WHERE auto IS NULL)');
+  assert.equal((await seed(other.db, env)).checklist_upgraded, false);
 });
 
 test('API desconhecida devolve 404 em JSON', async () => {
@@ -155,7 +177,7 @@ test('abrir o dia de hoje congela o snapshot', async () => {
   assert.equal(res.body.is_today, true);
   assert.equal(res.body.editable, true);
   assert.equal(res.body.day.points.max, 100);
-  assert.equal(allTasks(res.body).length, 9);
+  assert.equal(allTasks(res.body).length, 10);
   assert.equal((await db.get('SELECT COUNT(*) AS n FROM day_records')).n, 1);
 });
 
@@ -165,21 +187,20 @@ test('check-in cria snapshot e marca o ponto de entrada', async () => {
   const res = await agent.post(`/api/day/${MONDAY}/checkin`).expect(200);
   assert.equal(res.body.day.check_in_at, MONDAY_15H.toISOString());
   const row = await db.get('SELECT snapshot FROM day_records');
-  assert.equal(JSON.parse(row.snapshot).sections.length, 4);
+  // Ana é do caixa: o bloco da farmácia não entra no dia dela.
+  assert.deepEqual(JSON.parse(row.snapshot).sections.map((s) => s.title), ['Abertura', 'Caixa e atendimento', 'Fechamento']);
   const entrada = allTasks(res.body).find((t) => t.auto === 'check_in');
   assert.equal(entrada.done, true);
   assert.equal(res.body.day.points.earned, 10);
   await agent.post(`/api/day/${MONDAY}/checkin`).expect(409);
 });
 
-test('marcar as 9 tarefas e as postagens fecha 100 pontos', async () => {
+test('marcar as 10 tarefas fecha 100 pontos', async () => {
   const { app, clock } = await makeApp();
   const agent = await employeeAgent(app, request);
   let res = await agent.post(`/api/day/${MONDAY}/checkin`).expect(200);
   for (const task of allTasks(res.body).filter((t) => !t.auto)) {
-    if (task.posts?.length) {
-      for (const post of task.posts) await agent.put(`/api/day/${MONDAY}/posts/${post.id}`).expect(200);
-    } else if (task.requires_photo) {
+    if (task.requires_photo) {
       await agent
         .post(`/api/day/${MONDAY}/tasks/${task.id}/photo`)
         .attach('photo', FAKE_JPEG, { filename: 'limpeza.jpg', contentType: 'image/jpeg' })
@@ -194,7 +215,7 @@ test('marcar as 9 tarefas e as postagens fecha 100 pontos', async () => {
   assert.equal(res.body.day.points.earned, 90);
 
   res = await agent.post(`/api/day/${MONDAY}/close`).expect(200);
-  assert.deepEqual(res.body.day.points, { earned: 100, max: 100, done: 9, total: 9, meta: 100 });
+  assert.deepEqual(res.body.day.points, { earned: 100, max: 100, done: 10, total: 10, meta: 100 });
   assert.equal(res.body.editable, false);
 
   const task = allTasks(res.body).find((t) => !t.auto);

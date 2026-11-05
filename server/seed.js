@@ -4,7 +4,7 @@ import { openDb } from './db.js';
 import { hashSecret } from './lib/auth.js';
 import { nowISO, todayKey } from './lib/date.js';
 import { createChecklistVersion, employeeIds } from './lib/checklist.js';
-import { DEFAULT_SETTINGS, DEFAULT_CLEANING_FOCUS, DEFAULT_TEAM_SIZE, defaultSectionsFor, defaultPosts } from './lib/defaults.js';
+import { DEFAULT_SETTINGS, DEFAULT_CLEANING_FOCUS, DEFAULT_TEAM_SIZE, defaultSectionsFor } from './lib/defaults.js';
 
 // O login é só pelo PIN, então cada funcionário nasce com um PIN diferente (e troca no primeiro acesso).
 export const INITIAL_EMPLOYEE_PINS = ['1234', '5678'];
@@ -25,7 +25,7 @@ export async function seed(db, env = process.env) {
   }
 
   const now = nowISO();
-  const created = { manager: false, employees: 0, settings: 0, checklist: false, posts: false };
+  const created = { manager: false, employees: 0, settings: 0, checklist: false, checklist_upgraded: false };
 
   await db.transaction(async (tx) => {
     for (const [key, value] of Object.entries(DEFAULT_SETTINGS)) {
@@ -49,26 +49,20 @@ export async function seed(db, env = process.env) {
       created.employees++;
     }
 
-    if (!(await tx.get('SELECT 1 FROM checklist_versions'))) {
+    const hasChecklist = Boolean(await tx.get('SELECT 1 FROM checklist_versions'));
+    // Banco criado com a versão que tinha roteiro de postagens e ainda sem nenhum dia trabalhado:
+    // troca o checklist antigo pelo padrão por função. Com dia registrado, nada muda (a gerência usa "Restaurar padrão").
+    const outdated = hasChecklist && !(await tx.get('SELECT 1 FROM day_records')) && Boolean(await tx.get(
+      `SELECT 1 FROM checklist_tasks t JOIN checklist_sections s ON s.id = t.section_id
+       JOIN checklist_versions v ON v.id = s.version_id WHERE v.active = 1 AND t.active = 1 AND t.posts = 1`,
+    ));
+    if (!hasChecklist || outdated) {
       const sections = defaultSectionsFor(await employeeIds(tx));
       for (let weekday = 0; weekday <= 6; weekday++) {
         await createChecklistVersion(tx, weekday, { cleaning_focus: DEFAULT_CLEANING_FOCUS[weekday], sections }, todayKey());
       }
-      created.checklist = true;
-    }
-
-    // Roteiro inicial, uma vez só: se a gestora apagar tudo depois, o seed não recria.
-    if (!(await tx.get("SELECT 1 FROM settings WHERE key = 'roteiro_padrao_criado'"))) {
-      if (!(await tx.get('SELECT 1 FROM posts WHERE active = 1'))) {
-        for (const p of defaultPosts()) {
-          await tx.run(
-            'INSERT INTO posts (weekday, slot, time, kind, goal, image_prompt, text_prompt) VALUES (?, 0, ?, ?, ?, ?, ?)',
-            [p.weekday, p.time, p.kind, p.goal, p.image_prompt, p.text_prompt],
-          );
-        }
-        created.posts = true;
-      }
-      await tx.run("INSERT INTO settings (key, value) VALUES ('roteiro_padrao_criado', '1')");
+      created.checklist = !hasChecklist;
+      created.checklist_upgraded = outdated;
     }
   });
 
@@ -84,8 +78,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
       ? `Funcionários criados: ${r.employees} (PINs iniciais ${INITIAL_EMPLOYEE_PINS.join(' e ')}, troca obrigatória no primeiro acesso).`
       : 'Funcionários: já existiam.');
     console.log(`Configurações novas: ${r.settings}.`);
-    console.log(`Checklist padrão: ${r.checklist ? 'criado para os 7 dias' : 'já existia'}.`);
-    console.log(`Roteiro de postagens: ${r.posts ? 'criado' : 'já existia'}.`);
+    console.log(`Checklist padrão: ${r.checklist ? 'criado para os 7 dias' : r.checklist_upgraded ? 'atualizado para as tarefas por função' : 'já existia'}.`);
   } catch (err) {
     console.error(err.message);
     process.exitCode = 1;

@@ -19,7 +19,7 @@ test('gestora lê o checklist de um dia da semana', async () => {
   const res = await m.get('/api/manager/checklist/1').expect(200);
   assert.equal(res.body.checklist.version, 1);
   assert.equal(res.body.checklist.cleaning_focus, 'balcão e vitrine');
-  assert.equal(res.body.checklist.sections.length, 5);
+  assert.deepEqual(res.body.checklist.sections.map((sec) => sec.title), ['Abertura', 'Caixa e atendimento', 'Farmácia', 'Fechamento']);
   await m.get('/api/manager/checklist/7').expect(400);
 });
 
@@ -51,14 +51,15 @@ test('editar e salvar vale para o dia seguinte e não altera o passado', async (
   const tuesday = await employee.get('/api/day/2026-10-27').expect(200);
   assert.equal(tuesday.body.day.points.max, 110);
   assert.ok(tasksOf(tuesday.body).some((t) => t.text === 'Conferir validade dos testers'));
-  // A limpeza é do Bruno; a tarefa nova, sem responsável, aparece para os dois.
+  assert.ok(tasksOf(tuesday.body).some((t) => t.text === 'Limpeza do foco do dia: prateleiras de medicamentos'));
+  // A tarefa nova, sem responsável, aparece também para o Bruno, que não tem a limpeza.
   const brunoTuesday = await bruno.get('/api/day/2026-10-27').expect(200);
-  assert.ok(tasksOf(brunoTuesday.body).some((t) => t.text === 'Limpeza do foco do dia: prateleiras de medicamentos'));
+  assert.ok(!tasksOf(brunoTuesday.body).some((t) => t.text.startsWith('Limpeza do foco')));
   assert.ok(tasksOf(brunoTuesday.body).some((t) => t.text === 'Conferir validade dos testers'));
 
   // Segunda seguinte usa o foco novo.
   clock.now = new Date('2026-11-02T19:00:00Z');
-  const next = await bruno.get('/api/day/2026-11-02').expect(200);
+  const next = await employee.get('/api/day/2026-11-02').expect(200);
   assert.ok(tasksOf(next.body).some((t) => t.text === 'Limpeza do foco do dia: balcão e caixa'));
 });
 
@@ -74,7 +75,7 @@ test('salvar com o dia de hoje vazio já aplica hoje', async () => {
   assert.equal(day.body.day.points.max, 120);
 });
 
-test('restaurar padrão volta às 15 tarefas', async () => {
+test('restaurar padrão volta às 16 tarefas por função, num dia ou em vários', async () => {
   const { app } = await makeApp();
   const m = await managerAgent(app);
   await m
@@ -83,11 +84,20 @@ test('restaurar padrão volta às 15 tarefas', async () => {
     .expect(200);
   const res = await m.post('/api/manager/checklist/3/restore').expect(200);
   const tasks = res.body.checklist.sections.flatMap((s) => s.tasks);
-  assert.equal(tasks.length, 15);
+  assert.equal(tasks.length, 16);
   assert.equal(tasks.reduce((s, t) => s + t.points, 0), 170);
-  assert.equal(tasks.filter((t) => t.assignee != null).length, 12);
+  assert.equal(tasks.filter((t) => t.assignee != null).length, 13);
   assert.equal(res.body.checklist.cleaning_focus, 'perfumaria e higiene');
   assert.equal(res.body.checklist.version, 3);
+  assert.deepEqual(res.body.saved_weekdays, [3]);
+
+  // Vários dias de uma vez: cada um mantém o próprio foco de limpeza.
+  const all = await m.post('/api/manager/checklist/1/restore').send({ also_weekdays: [2, 3, 4, 5, 6] }).expect(200);
+  assert.deepEqual(all.body.saved_weekdays, [1, 2, 3, 4, 5, 6]);
+  const saturday = (await m.get('/api/manager/checklist/6').expect(200)).body.checklist;
+  assert.equal(saturday.cleaning_focus, 'gôndolas e piso');
+  assert.equal(saturday.version, 2);
+  await m.post('/api/manager/checklist/1/restore').send({ also_weekdays: [9] }).expect(400);
 });
 
 test('checklist inválido é recusado com mensagem clara', async () => {
@@ -133,99 +143,6 @@ test('configurações: salvar, validar e registrar no audit_log', async () => {
 
   const log = await db.all("SELECT * FROM audit_log WHERE action = 'settings.update'");
   assert.equal(log.length, 1);
-});
-
-function postsOfDay(body) {
-  return body.day.sections.flatMap((sec) => sec.tasks).find((t) => t.posts).posts;
-}
-
-test('roteiro: criar, editar, aparecer no dia e excluir', async () => {
-  const { app } = await makeApp();
-  const m = await managerAgent(app);
-  const weekly = (await m.get('/api/manager/posts').expect(200)).body.weekly;
-  assert.equal(weekly.filter((p) => p.weekday === 1).length, 3); // roteiro padrão do seed
-
-  const created = await m
-    .post('/api/manager/posts')
-    .send({ weekday: 1, time: '09:00', kind: 'mensagem', goal: 'Lembrete', image_prompt: 'Foto de protetor solar', text_prompt: 'Mensagem curta' })
-    .expect(201);
-  const id = created.body.post.id;
-  await m.put(`/api/manager/posts/${id}`).send({ ...created.body.post, goal: 'Lembrete da promoção' }).expect(200);
-  await m.post('/api/manager/posts').send({ weekday: 1, time: '25:00', kind: 'feed', image_prompt: 'x' }).expect(400);
-  await m.post('/api/manager/posts').send({ weekday: 1, time: '10:00', kind: 'feed' }).expect(400);
-  await m.post('/api/manager/posts').send({ weekday: 1, time: '10:00', kind: 'outdoor', image_prompt: 'x' }).expect(400);
-
-  const employee = await employeeAgent(app, request);
-  const day = await employee.get(`/api/day/${MONDAY}`).expect(200);
-  const posts = postsOfDay(day.body);
-  assert.equal(posts.length, 4);
-  assert.equal(posts[0].goal, 'Lembrete da promoção'); // em ordem de horário
-  assert.match(posts[0].image_prompt_full, /^Foto de protetor solar\n\nEstilo Drogaria Bem Popular/);
-
-  await m.delete(`/api/manager/posts/${id}`).expect(200);
-  await m.get(`/api/manager/posts/${id}`).expect(404);
-  const after = await employee.get(`/api/day/${MONDAY}`).expect(200);
-  assert.equal(postsOfDay(after.body).length, 3);
-});
-
-test('postagens: até 10 por dia, marcadas uma a uma, com atraso sem perder pontos', async () => {
-  const { app, clock } = await makeApp();
-  const m = await managerAgent(app);
-  for (let i = 0; i < 7; i++) {
-    await m.post('/api/manager/posts').send({ weekday: 1, time: `1${i}:45`, kind: 'stories', image_prompt: `p${i}` }).expect(201);
-  }
-  const extra = await m.post('/api/manager/posts').send({ weekday: 1, time: '18:30', kind: 'feed', image_prompt: 'x' });
-  assert.equal(extra.status, 409);
-
-  const employee = await employeeAgent(app, request);
-  let res = await employee.post(`/api/day/${MONDAY}/checkin`).expect(200);
-  const task = res.body.day.sections.flatMap((s) => s.tasks).find((t) => t.posts);
-  assert.equal(task.posts.length, 10);
-  await employee.put(`/api/day/${MONDAY}/tasks/${task.id}`).expect(409); // só postagem por postagem
-
-  const before = res.body.day.points.earned;
-  const [first, second] = task.posts; // 09:30 e 10:45; o relógio está em 15:00
-  res = await employee.put(`/api/day/${MONDAY}/posts/${first.id}`).expect(200);
-  assert.equal(res.body.day.points.earned, before + 2);
-  res = await employee.put(`/api/day/${MONDAY}/posts/${second.id}`).expect(200);
-  const marked = postsOfDay(res.body);
-  assert.equal(marked[0].done, true);
-  assert.equal(marked[0].late, true);
-  assert.equal(res.body.day.points.earned, before + 4);
-  res = await employee.delete(`/api/day/${MONDAY}/posts/${second.id}`).expect(200);
-  assert.equal(res.body.day.points.earned, before + 2);
-
-  for (const post of task.posts) await employee.put(`/api/day/${MONDAY}/posts/${post.id}`).expect(200);
-  res = await employee.get(`/api/day/${MONDAY}`).expect(200);
-  const done = res.body.day.sections.flatMap((s) => s.tasks).find((t) => t.posts);
-  assert.equal(done.done, true);
-  assert.equal(res.body.day.points.earned, before + 20);
-
-  clock.now = new Date('2026-10-26T22:00:00Z');
-  res = await employee.get(`/api/day/${MONDAY}`).expect(200);
-  assert.equal(res.body.now_time, '18:00');
-});
-
-test('programação por data substitui o roteiro da semana e pode ser copiada', async () => {
-  const { app } = await makeApp();
-  const m = await managerAgent(app);
-  await m.post('/api/manager/posts').send({ date: '2026-11-03', time: '14:00', kind: 'feed', goal: 'Lançamento', image_prompt: 'Vitrine' }).expect(201);
-  const month = await m.get('/api/manager/posts?from=2026-11-01&to=2026-11-30').expect(200);
-  assert.equal(month.body.dated.length, 1);
-  assert.equal(month.body.dated[0].weekday, 2);
-
-  const copy = await m.post('/api/manager/posts/copy').send({ source_date: '2026-11-03', target_dates: ['2026-11-04', '2026-11-05'] }).expect(200);
-  assert.deepEqual(copy.body.dates, ['2026-11-04', '2026-11-05']);
-  const after = await m.get('/api/manager/posts?from=2026-11-01&to=2026-11-30').expect(200);
-  assert.deepEqual(after.body.dated.map((p) => p.date), ['2026-11-03', '2026-11-04', '2026-11-05']);
-
-  // Copiar um dia sem programação própria leva o roteiro da semana dele.
-  await m.post('/api/manager/posts/copy').send({ source_date: '2026-11-09', target_dates: ['2026-11-04'] }).expect(200);
-  const wed = (await m.get('/api/manager/posts?from=2026-11-04&to=2026-11-04').expect(200)).body.dated;
-  assert.equal(wed.length, 3);
-
-  const cleared = await m.delete('/api/manager/posts/day/2026-11-04').expect(200);
-  assert.equal(cleared.body.removed, 3);
 });
 
 test('funcionária não acessa o editor', async () => {

@@ -68,8 +68,7 @@ test('comparativo da equipe traz os dois funcionários lado a lado', async () =>
   clock.now = at(MONDAY, '08:00');
   let res = await ana.post(`/api/day/${MONDAY}/checkin`).expect(200);
   for (const t of tasksOf(res.body).filter((x) => !x.auto)) {
-    if (t.posts?.length) for (const p of t.posts) await ana.put(`/api/day/${MONDAY}/posts/${p.id}`).expect(200);
-    else if (t.requires_photo) {
+    if (t.requires_photo) {
       await ana.post(`/api/day/${MONDAY}/tasks/${t.id}/photo`)
         .attach('photo', FAKE_JPEG, { filename: 'f.jpg', contentType: 'image/jpeg' })
         .expect(200);

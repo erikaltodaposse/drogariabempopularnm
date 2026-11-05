@@ -379,7 +379,7 @@ export function dashboardView({ today }) {
       h('h2', { id: 'export-title' }, 'Exportar'),
       h('p', { class: 'muted' }, `Planilha de ${personName()} com um dia por linha (${p.days ? `últimos ${p.days} dias` : 'todo o histórico'}). Abre direto no Excel.`),
       h('a', { class: 'btn btn-outline', href: `/api/manager/export.csv?${query()}`, download: '' }, 'Baixar planilha (CSV)'),
-      h('p', { class: 'muted mt' }, 'Backup completo dos registros, tarefas, ajustes e roteiro. Guarde em lugar seguro: as fotos são copiadas à parte pelo backup do servidor.'),
+      h('p', { class: 'muted mt' }, 'Backup completo dos registros, tarefas e ajustes. Guarde em lugar seguro: as fotos são copiadas à parte pelo backup do servidor.'),
       h('a', { class: 'btn btn-outline', href: '/api/manager/backup.json', download: '' }, 'Baixar backup (JSON)'),
     );
   }

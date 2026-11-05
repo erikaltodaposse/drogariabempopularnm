@@ -33,8 +33,11 @@ a API só responde `/api/me`, `/api/auth/change-pin` e `/api/auth/logout`.
 - **Contagem de estoque** (`stock_counts`, `stock_count_parts`, migração 6): lista ordenada de partes, compartilhada
   pelos funcionários. Cada parte guarda quem contou e quando, e uma anotação de onde parou (apagada quando a parte é
   contada). A próxima parte é a primeira não contada. A contagem fecha quando todas estão contadas e reabre se uma
-  for desmarcada. Não guarda quantidades e não soma pontos. A gerência edita nome e partes sem perder o andamento
+  for desmarcada. Não guarda quantidades. A gerência edita nome e partes sem perder o andamento
   (parte contada não sai) e pode cancelar. Rotas em `/api/counts`.
+- **Tarefa de contagem** (`auto = 'count'`, migração 7): tarefa do checklist que mostra as partes da contagem em
+  andamento e fica feita enquanto a pessoa tiver contado pelo menos uma parte naquele dia. Sem contagem em andamento,
+  é marcada à mão. Não pede foto.
 - Expediente de segunda a sábado (`dias_expediente = 1,2,3,4,5,6`).
 - Faixas: Ouro ≥ 95%, Prata 88–94%, Bronze 80–87%, Abaixo < 80%. Só cálculo e exibição.
 - Snapshot congelado no primeiro registro do dia. Editar o checklist cria nova versão; o dia de hoje ainda vazio
@@ -88,9 +91,9 @@ desenvolvimento), frontend em HTML, CSS e JS puros sem build, fotos no Vercel Bl
     duas tarefas de ponto foram para as tarefas de cada um. Num checklist antigo, as tarefas de ponto ficam fora dos
     dias novos e somem ao abrir o editor; o dia de hoje ainda vazio é remontado sem elas. As colunas do banco ficam.
 14. **Removido o ajuste do snapshot antigo da Nil** (`upgradeLegacyDay`) — esta base começa com banco novo.
-15. **Contagem de estoque fora do checklist** (05/11: "só o andamento" e "podem dividir a mesma"): é um cartão à
-    parte no dia de cada funcionário, não uma tarefa com pontos, porque atravessa dias e é dividida entre os dois.
-    Para valer pontos, mantenha uma tarefa comum de contagem no checklist.
+15. **Contagem de estoque dentro da tarefa** (05/11, Erik achou o cartão separado redundante): a contagem aparece
+    dentro da tarefa de contagem do checklist e a marca sozinha quando a pessoa conta uma parte no dia, valendo os
+    pontos da tarefa. Quem não tem essa tarefa no checklist vê a contagem num cartão à parte.
 16. **Fuso de Manaus mantido** — a confirmar com o Erik.
 
 ## 6. Pendências

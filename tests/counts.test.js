@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import request from 'supertest';
-import { makeApp, MANAGER, employeeAgent, BRUNO } from './helpers.js';
+import { makeApp, MANAGER, employeeAgent, BRUNO, MONDAY } from './helpers.js';
 import { at } from './scenario.js';
 
 async function managerAgent(app) {
@@ -90,4 +90,44 @@ test('gerência edita a contagem sem perder o andamento', async () => {
   assert.equal((await ana.get('/api/counts').expect(200)).body.open.length, 0);
   await ana.put(`/api/counts/${count.id}/parts/${b.id}`).expect(404);
   await request(app).get('/api/counts').expect(401);
+});
+
+test('tarefa de contagem do checklist se marca ao contar uma parte no dia', async () => {
+  const { app } = await makeApp();
+  const m = await managerAgent(app);
+  const { checklist } = (await m.get('/api/manager/checklist/1').expect(200)).body;
+  // Foto pedida numa tarefa de contagem é ignorada: ela se marca sozinha.
+  checklist.sections[0].tasks.push({ text: 'Contagem de estoque', points: 20, requires_photo: true, auto: 'count' });
+  const saved = await m.put('/api/manager/checklist/1').send(checklist).expect(200);
+  const savedTask = saved.body.checklist.sections[0].tasks.at(-1);
+  assert.equal(savedTask.auto, 'count');
+  assert.equal(savedTask.requires_photo, false);
+
+  const ana = await employeeAgent(app, request);
+  const dayUrl = `/api/day/${MONDAY}`;
+  const countTask = (body) => body.day.sections.flatMap((s) => s.tasks).find((t) => t.auto === 'count');
+
+  // Sem contagem em andamento: é uma tarefa comum, marcada à mão.
+  let day = (await ana.get(dayUrl).expect(200)).body;
+  assert.equal(day.stock_count_open, false);
+  await ana.put(`${dayUrl}/tasks/${countTask(day).id}`).expect(200);
+  await ana.delete(`${dayUrl}/tasks/${countTask(day).id}`).expect(200);
+
+  // Com contagem: só se marca pelas partes.
+  const { count } = (await m.post('/api/counts').send({ title: 'Geral', parts: ['A', 'B'] }).expect(201)).body;
+  day = (await ana.get(dayUrl).expect(200)).body;
+  assert.equal(day.stock_count_open, true);
+  await ana.put(`${dayUrl}/tasks/${countTask(day).id}`).expect(409);
+
+  const part = `/api/counts/${count.id}/parts/${count.parts[0].id}`;
+  await ana.put(part).expect(200);
+  day = (await ana.get(dayUrl).expect(200)).body;
+  assert.equal(countTask(day).done, true);
+  const pointsWith = day.day.points.earned;
+
+  // Desmarcar a única parte contada hoje desmarca a tarefa.
+  await ana.delete(part).expect(200);
+  day = (await ana.get(dayUrl).expect(200)).body;
+  assert.equal(countTask(day).done, false);
+  assert.equal(day.day.points.earned, pointsWith - 20);
 });

@@ -69,7 +69,7 @@ export function checklistEditor({ setGuard }) {
   }
 
   function assigneeSelect(task) {
-    const select = h('select', { id: nextId(), disabled: Boolean(task.auto) },
+    const select = h('select', { id: nextId(), disabled: task.auto === 'close' },
       h('option', { value: '' }, 'Todos (cada um faz a sua)'),
       employees.map((e) => h('option', { value: String(e.id) }, e.name)));
     select.value = task.assignee == null ? '' : String(task.assignee);
@@ -78,7 +78,7 @@ export function checklistEditor({ setGuard }) {
       markDirty();
     });
     return h('div', { class: 'field' }, h('label', { for: select.id }, 'Responsável'), select,
-      task.auto && h('p', { class: 'field-hint' }, 'Fechar o dia é de todos: cada um fecha o seu.'));
+      task.auto === 'close' && h('p', { class: 'field-hint' }, 'Fechar o dia é de todos: cada um fecha o seu.'));
   }
 
   const isVisible = (task) => person == null || task.assignee == null || task.assignee === person;
@@ -146,8 +146,17 @@ export function checklistEditor({ setGuard }) {
     const points = h('input', { type: 'number', inputmode: 'numeric', min: '0', max: '1000', step: '1', value: String(task.points), id: nextId() });
     points.addEventListener('input', () => { task.points = points.value === '' ? '' : Number(points.value); markDirty(); });
 
-    const photo = h('input', { type: 'checkbox', id: nextId(), checked: task.requires_photo });
+    const photo = h('input', { type: 'checkbox', id: nextId(), checked: task.requires_photo, disabled: task.auto === 'count' });
     photo.addEventListener('change', () => { task.requires_photo = photo.checked; markDirty(); });
+
+    // Tarefa de contagem: mostra as partes da contagem em andamento e se marca quando a pessoa conta uma.
+    const count = h('input', { type: 'checkbox', id: nextId(), checked: task.auto === 'count' });
+    count.addEventListener('change', () => {
+      task.auto = count.checked ? 'count' : null;
+      if (count.checked) task.requires_photo = false;
+      markDirty();
+      render();
+    });
 
     const due = h('input', { type: 'time', id: nextId(), value: task.due_time ?? '' });
     due.addEventListener('input', () => { task.due_time = due.value || null; markDirty(); });
@@ -158,7 +167,7 @@ export function checklistEditor({ setGuard }) {
       { class: 'edit-task' },
       h('label', { class: 'sr-only', for: textId }, `Texto da tarefa ${tIdx + 1}`),
       h('textarea', { id: textId, rows: '2', maxlength: '200', oninput: (e) => { task.text = e.target.value; markDirty(); } }, task.text),
-      task.auto && h('p', { class: 'field-hint' }, `Marcada automaticamente no ${AUTO_LABELS[task.auto]}.`),
+      task.auto === 'close' && h('p', { class: 'field-hint' }, `Marcada automaticamente no ${AUTO_LABELS[task.auto]}.`),
       assigneeSelect(task),
       h(
         'div',
@@ -167,6 +176,9 @@ export function checklistEditor({ setGuard }) {
         h('div', { class: 'field field-inline' }, h('label', { for: due.id }, 'Horário'), due),
         h('div', { class: 'check-field' }, photo, h('label', { for: photo.id }, 'Exige foto')),
       ),
+      task.auto !== 'close' && h('div', { class: 'check-field' }, count, h('label', { for: count.id }, 'É a contagem de estoque')),
+      task.auto === 'count' && h('p', { class: 'field-hint' },
+        'As partes da contagem aparecem dentro desta tarefa, e ela se marca sozinha quando a pessoa conta uma parte no dia. Sem contagem em andamento, é marcada à mão.'),
       h(
         'div',
         { class: 'row-actions' },

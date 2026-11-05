@@ -188,6 +188,14 @@ const MIGRATIONS = [
   );
   CREATE INDEX idx_stock_count_parts_count ON stock_count_parts(count_id, position);
   `,
+  // Tarefa "contagem de estoque": se marca sozinha quando a pessoa conta uma parte da contagem em andamento.
+  // O CHECK antigo da coluna auto não aceitava o tipo novo; a coluna é refeita com os mesmos valores.
+  `
+  ALTER TABLE checklist_tasks ADD COLUMN auto_kind TEXT CHECK (auto_kind IN ('check_in', 'check_out', 'close', 'count'));
+  UPDATE checklist_tasks SET auto_kind = auto;
+  ALTER TABLE checklist_tasks DROP COLUMN auto;
+  ALTER TABLE checklist_tasks RENAME COLUMN auto_kind TO auto;
+  `,
 ];
 
 /**

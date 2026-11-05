@@ -7,9 +7,8 @@ import { defaultSectionsFor } from '../server/lib/defaults.js';
 const ANA = 1;
 const BRUNO = 2;
 
-// Ids na ordem do checklist padrão: 1 entrada, 2 abrir, 3 caixa, 4 geladeira, 5 foco, 6 gôndolas, 7 preços,
-// 8 WhatsApp, 9 receitas, 10 validade, 11 recebimento, 12 reposição, 13 controlados, 14 fechamento de caixa,
-// 15 saída, 16 fechar o dia. Ana é do caixa e atendimento; Bruno, farmacêutico.
+// Ids na ordem do checklist padrão: 1 abrir, 2 caixa, 3 geladeira, 4 foco, 5 gôndolas, 6 preços, 7 WhatsApp,
+// 8 receitas, 9 validade, 10 recebimento, 11 reposição, 12 controlados, 13 fechamento de caixa, 14 fechar o dia. Ana é do caixa e atendimento; Bruno, farmacêutico.
 function defaultTemplate() {
   let id = 0;
   return {
@@ -20,10 +19,10 @@ function defaultTemplate() {
   };
 }
 
-test('o checklist padrão tem 16 tarefas e dá 100 pontos para cada funcionário', async () => {
+test('o checklist padrão tem 14 tarefas e dá 100 pontos para cada funcionário', async () => {
   const all = buildSnapshot(defaultTemplate());
-  assert.equal(snapshotTasks(all).length, 16);
-  for (const [uid, n] of [[ANA, 10], [BRUNO, 9]]) {
+  assert.equal(snapshotTasks(all).length, 14);
+  for (const [uid, n] of [[ANA, 8], [BRUNO, 7]]) {
     const snap = buildSnapshot(defaultTemplate(), uid);
     const ids = snapshotTasks(snap).map((t) => t.id);
     assert.equal(ids.length, n);
@@ -34,8 +33,8 @@ test('o checklist padrão tem 16 tarefas e dá 100 pontos para cada funcionário
 test('cada um só recebe as próprias tarefas e as em comum', async () => {
   const ana = buildSnapshot(defaultTemplate(), ANA);
   const bruno = buildSnapshot(defaultTemplate(), BRUNO);
-  assert.deepEqual(snapshotTasks(ana).map((t) => t.id), [1, 2, 3, 5, 6, 7, 8, 14, 15, 16]);
-  assert.deepEqual(snapshotTasks(bruno).map((t) => t.id), [1, 4, 9, 10, 11, 12, 13, 15, 16]);
+  assert.deepEqual(snapshotTasks(ana).map((t) => t.id), [1, 2, 4, 5, 6, 7, 13, 14]);
+  assert.deepEqual(snapshotTasks(bruno).map((t) => t.id), [3, 8, 9, 10, 11, 12, 14]);
   // O bloco "Farmácia" é todo do Bruno e o "Caixa e atendimento" todo da Ana: cada um some do dia do outro.
   assert.ok(!ana.sections.some((s) => s.title === 'Farmácia'));
   assert.ok(!bruno.sections.some((s) => s.title === 'Caixa e atendimento'));
@@ -44,10 +43,10 @@ test('cada um só recebe as próprias tarefas e as em comum', async () => {
 
 test('dia parcial soma só o que foi marcado', async () => {
   const snap = buildSnapshot(defaultTemplate(), ANA);
-  // 1: ponto de entrada (10), 3: caixa (10), 6: gôndolas (10)
-  assert.deepEqual(dayPoints(snap, [1, 3, 6]), { earned: 30, max: 100, done: 3, total: 10 });
-  // A geladeira (4) é do Bruno: marcada no dia da Ana, não conta.
-  assert.equal(dayPoints(snap, [1, 3, 4]).earned, 20);
+  // 1: abrir a loja (10), 2: caixa (10), 5: gôndolas (15)
+  assert.deepEqual(dayPoints(snap, [1, 2, 5]), { earned: 35, max: 100, done: 3, total: 8 });
+  // A geladeira (3) é do Bruno: marcada no dia da Ana, não conta.
+  assert.equal(dayPoints(snap, [1, 2, 3]).earned, 20);
   assert.equal(dayPoints(snap, []).earned, 0);
 });
 
@@ -56,11 +55,11 @@ test('tarefa removida do template não afeta dia antigo', async () => {
   const oldDay = buildSnapshot(template, BRUNO);
   const allIds = snapshotTasks(oldDay).map((t) => t.id);
 
-  template.sections[2].tasks.shift(); // remove a conferência das receitas (15 pontos)
+  template.sections[2].tasks.shift(); // remove a conferência das receitas (20 pontos)
   const newDay = buildSnapshot(template, BRUNO);
 
   assert.equal(dayPoints(oldDay, allIds).earned, 100);
-  assert.equal(dayPoints(newDay, allIds).max, 85);
+  assert.equal(dayPoints(newDay, allIds).max, 80);
 });
 
 test('foco do dia entra no texto da tarefa', async () => {

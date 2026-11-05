@@ -23,10 +23,9 @@ test('cada funcionário entra com o próprio PIN e vê só as próprias tarefas'
   assert.ok(tasksOf(a.body).some((t) => t.text === 'Conferir caixa e troco inicial'));
   assert.ok(!tasksOf(b.body).some((t) => t.text === 'Conferir caixa e troco inicial'));
   assert.ok(tasksOf(b.body).some((t) => t.text.startsWith('Conferir a validade')));
-  // Entrada é das duas pessoas: cada uma bate o próprio ponto.
-  await ana.post(`/api/day/${MONDAY}/checkin`).expect(200);
-  const again = await bruno.post(`/api/day/${MONDAY}/checkin`).expect(200);
-  assert.equal(again.body.day.points.earned, 10);
+  // Fechar o dia é das duas pessoas: cada uma fecha o seu.
+  assert.ok(tasksOf(a.body).some((t) => t.auto === 'close'));
+  assert.ok(tasksOf(b.body).some((t) => t.auto === 'close'));
 
   // A tarefa do outro não pode ser marcada.
   const caixa = tasksOf(a.body).find((t) => t.text === 'Conferir caixa e troco inicial');
@@ -46,27 +45,33 @@ test('gestora troca o responsável de uma tarefa e o dia seguinte já segue a tr
   caixa.assignee = bruno.id;
   await m.put('/api/manager/checklist/2').send(checklist).expect(200);
 
-  // Entrada, saída e fechamento não aceitam responsável.
+  // Fechar o dia não aceita responsável.
   const bad = structuredClone(checklist);
-  bad.sections[0].tasks[0].assignee = ana.id;
+  bad.sections.at(-1).tasks.find((t) => t.auto === 'close').assignee = ana.id;
   const res = await m.put('/api/manager/checklist/2').send(bad);
   assert.equal(res.status, 400);
   assert.match(res.body.message, /todos os funcionários/);
+  // Tarefa de ponto não volta pelo editor.
+  const ponto = structuredClone(checklist);
+  ponto.sections[0].tasks.push({ text: 'Bater ponto', points: 10, auto: 'check_in' });
+  const refused = await m.put('/api/manager/checklist/2').send(ponto);
+  assert.equal(refused.status, 400);
+  assert.match(refused.body.message, /entrada e saída saiu do app/);
 
   clock.now = at('2026-10-27', '09:00');
   const b = await employeeAgent(app, request, BRUNO);
   const day = await b.get('/api/day/2026-10-27').expect(200);
   assert.ok(tasksOf(day.body).some((t) => t.text === 'Conferir caixa e troco inicial'));
-  assert.equal(day.body.day.points.max, 110);
+  assert.equal(day.body.day.points.max, 110); // 100 dele + o caixa
 });
 
 test('comparativo da equipe traz os dois funcionários lado a lado', async () => {
   const { app, clock } = await makeApp();
   const ana = await employeeAgent(app, request);
   const bruno = await employeeAgent(app, request, BRUNO);
-  // Segunda: Ana faz tudo; Bruno só bate entrada e saída.
+  // Segunda: Ana faz tudo; Bruno só recebe as mercadorias e fecha o dia.
   clock.now = at(MONDAY, '08:00');
-  let res = await ana.post(`/api/day/${MONDAY}/checkin`).expect(200);
+  const res = await ana.get(`/api/day/${MONDAY}`).expect(200);
   for (const t of tasksOf(res.body).filter((x) => !x.auto)) {
     if (t.requires_photo) {
       await ana.post(`/api/day/${MONDAY}/tasks/${t.id}/photo`)
@@ -74,12 +79,11 @@ test('comparativo da equipe traz os dois funcionários lado a lado', async () =>
         .expect(200);
     } else await ana.put(`/api/day/${MONDAY}/tasks/${t.id}`).expect(200);
   }
-  await bruno.post(`/api/day/${MONDAY}/checkin`).expect(200);
+  const bDay = await bruno.get(`/api/day/${MONDAY}`).expect(200);
+  const receber = tasksOf(bDay.body).find((t) => t.text.startsWith('Receber mercadorias'));
+  await bruno.put(`/api/day/${MONDAY}/tasks/${receber.id}`).expect(200);
   clock.now = at(MONDAY, '18:00');
-  for (const agent of [ana, bruno]) {
-    await agent.post(`/api/day/${MONDAY}/checkout`).expect(200);
-    await agent.post(`/api/day/${MONDAY}/close`).expect(200);
-  }
+  for (const agent of [ana, bruno]) await agent.post(`/api/day/${MONDAY}/close`).expect(200);
 
   clock.now = at('2026-10-27', '10:00');
   const m = await managerAgent(app);
@@ -90,7 +94,7 @@ test('comparativo da equipe traz os dois funcionários lado a lado', async () =>
   assert.equal(a.summary.adherence, 1);
   assert.equal(a.summary.tier.id, 'ouro');
   assert.equal(b.employee.name, 'Bruno');
-  assert.equal(b.summary.total_points, 30);
+  assert.equal(b.summary.total_points, 20);
   assert.equal(b.summary.tier.id, 'abaixo');
   assert.equal(b.failures[0].missed, 1);
   // Terça ainda não começou para ninguém.
@@ -99,7 +103,7 @@ test('comparativo da equipe traz os dois funcionários lado a lado', async () =>
   // O painel individual aceita o id do Bruno.
   const solo = await m.get(`/api/manager/summary?from=${MONDAY}&user_id=${b.employee.id}`).expect(200);
   assert.equal(solo.body.employee.name, 'Bruno');
-  assert.equal(solo.body.summary.total_points, 30);
+  assert.equal(solo.body.summary.total_points, 20);
   await ana.get('/api/manager/team').expect(403);
 });
 

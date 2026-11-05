@@ -6,7 +6,7 @@ import { isLateDone } from './checklist.js';
 
 /**
  * Linhas de dia já com snapshot e checks:
- * { date, check_in_at, check_out_at, closed_at, snapshot, checks: [{task_id, done_at, photo_path}] }.
+ * { date, closed_at, snapshot, checks: [{task_id, done_at, photo_path}] }.
  */
 export async function loadDayRows(db, userId, from, to) {
   const range = 'user_id = ? AND (? IS NULL OR date >= ?) AND (? IS NULL OR date <= ?)';
@@ -52,8 +52,8 @@ export function dayPunctuality(row) {
   return { timed, on_time: onTime };
 }
 
-/** Resumo do período. `isLate(row)` diz se a saída passou da tolerância. */
-export function summarize(rows, { today, meta, bonusBase, workdays, from, to, isLate }) {
+/** Resumo do período. */
+export function summarize(rows, { today, meta, bonusBase, workdays, from, to }) {
   const counted = rows.filter((r) => isCountable(r, today));
   const series = counted.map((r) => {
     const p = dayStats(r);
@@ -79,7 +79,6 @@ export function summarize(rows, { today, meta, bonusBase, workdays, from, to, is
     adherence: adh.ratio,
     tier: tier ? { id: tier.id, label: tier.label, share: tier.share } : null,
     bonus_value: tier ? Math.round(bonusBase * tier.share * 100) / 100 : 0,
-    late_checkouts: counted.filter(isLate).length,
     tasks: counted.map(dayStats).reduce((acc, p) => ({ done: acc.done + p.done, total: acc.total + p.total }), { done: 0, total: 0 }),
     punctuality: (() => {
       const p = counted.map(dayPunctuality).reduce((a, b) => ({ timed: a.timed + b.timed, on_time: a.on_time + b.on_time }), { timed: 0, on_time: 0 });
@@ -132,15 +131,12 @@ export function failureRanking(rows, today) {
 }
 
 /** Linha do histórico: um dia com pontos, horários e situação. */
-export function historyRow(row, { today, isLate }) {
+export function historyRow(row, { today }) {
   const p = dayStats(row);
   const photoTasks = snapshotTasks(row.snapshot).filter((t) => t.requires_photo).length;
   return {
     date: row.date,
-    check_in_at: row.check_in_at,
-    check_out_at: row.check_out_at,
     closed_at: row.closed_at,
-    late_checkout: isLate(row),
     points: p.earned,
     max: p.max,
     done: p.done,

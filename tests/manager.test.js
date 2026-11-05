@@ -30,7 +30,8 @@ test('editar e salvar vale para o dia seguinte e não altera o passado', async (
   const m = await managerAgent(app);
 
   // Segunda: funcionária registra o dia com o checklist original.
-  await employee.post(`/api/day/${MONDAY}/checkin`).expect(200);
+  const first = (await employee.get(`/api/day/${MONDAY}`).expect(200)).body.day.sections[0].tasks[0];
+  await employee.put(`/api/day/${MONDAY}/tasks/${first.id}`).expect(200);
 
   // Gestora cadastra uma tarefa nova para segunda e terça.
   const { body } = await m.get('/api/manager/checklist/1');
@@ -72,10 +73,10 @@ test('salvar com o dia de hoje vazio já aplica hoje', async () => {
   body.checklist.sections[0].tasks[1].points = 25;
   await m.put('/api/manager/checklist/1').send(body.checklist).expect(200);
   const day = await employee.get(`/api/day/${MONDAY}`).expect(200);
-  assert.equal(day.body.day.points.max, 120);
+  assert.equal(day.body.day.points.max, 115);
 });
 
-test('restaurar padrão volta às 16 tarefas por função, num dia ou em vários', async () => {
+test('restaurar padrão volta às 14 tarefas por função, num dia ou em vários', async () => {
   const { app } = await makeApp();
   const m = await managerAgent(app);
   await m
@@ -84,8 +85,8 @@ test('restaurar padrão volta às 16 tarefas por função, num dia ou em vários
     .expect(200);
   const res = await m.post('/api/manager/checklist/3/restore').expect(200);
   const tasks = res.body.checklist.sections.flatMap((s) => s.tasks);
-  assert.equal(tasks.length, 16);
-  assert.equal(tasks.reduce((s, t) => s + t.points, 0), 170);
+  assert.equal(tasks.length, 14);
+  assert.equal(tasks.reduce((s, t) => s + t.points, 0), 190);
   assert.equal(tasks.filter((t) => t.assignee != null).length, 13);
   assert.equal(res.body.checklist.cleaning_focus, 'perfumaria e higiene');
   assert.equal(res.body.checklist.version, 3);

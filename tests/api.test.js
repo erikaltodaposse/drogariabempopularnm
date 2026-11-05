@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import request from 'supertest';
 import fs from 'node:fs';
 import path from 'node:path';
-import { makeApp, MANAGER, MONDAY, MONDAY_15H, employeeAgent, FAKE_JPEG, BRUNO } from './helpers.js';
+import { makeApp, MANAGER, MONDAY, employeeAgent, FAKE_JPEG, BRUNO } from './helpers.js';
 import { seed } from '../server/seed.js';
 
 async function loginEmployee(agent, pin = '1234') {
@@ -120,8 +120,9 @@ test('seed é idempotente e cria dois funcionários e o checklist de cada dia', 
   );
   assert.equal(totals.length, 7);
   for (const row of totals) {
-    assert.equal(row.total, 170);
-    assert.equal(row.n, 16);
+    assert.equal(row.total, 190);
+    assert.equal(row.n, 14);
+    // O registro de entrada e saída saiu do app: só "fechar o dia" é automática.
   }
   assert.equal((await db.get('SELECT COUNT(*) AS n FROM users')).n, 3);
   // Cada funcionário soma 100 pontos: as tarefas dele mais as sem responsável.
@@ -146,13 +147,15 @@ test('seed troca o checklist antigo com postagens pelo padrão por função, só
     `SELECT t.posts FROM checklist_tasks t JOIN checklist_sections s ON s.id = t.section_id
      JOIN checklist_versions v ON v.id = s.version_id WHERE v.active = 1`,
   );
-  assert.equal(active.length, 16 * 7);
+  assert.equal(active.length, 14 * 7);
   assert.ok(active.every((t) => t.posts === 0));
 
   // Com um dia registrado, o seed não mexe mais no checklist.
   const other = await makeApp();
   const { app } = other;
-  await (await employeeAgent(app, request)).post(`/api/day/${MONDAY}/checkin`).expect(200);
+  const ana = await employeeAgent(app, request);
+  const first = (await ana.get(`/api/day/${MONDAY}`).expect(200)).body.day.sections[0].tasks[0];
+  await ana.put(`/api/day/${MONDAY}/tasks/${first.id}`).expect(200);
   await other.db.run('UPDATE checklist_tasks SET posts = 1 WHERE id = (SELECT MIN(id) FROM checklist_tasks WHERE auto IS NULL)');
   assert.equal((await seed(other.db, env)).checklist_upgraded, false);
 });
@@ -177,28 +180,42 @@ test('abrir o dia de hoje congela o snapshot', async () => {
   assert.equal(res.body.is_today, true);
   assert.equal(res.body.editable, true);
   assert.equal(res.body.day.points.max, 100);
-  assert.equal(allTasks(res.body).length, 10);
+  assert.equal(allTasks(res.body).length, 8);
   assert.equal((await db.get('SELECT COUNT(*) AS n FROM day_records')).n, 1);
-});
-
-test('check-in cria snapshot e marca o ponto de entrada', async () => {
-  const { app, db } = await makeApp();
-  const agent = await employeeAgent(app, request);
-  const res = await agent.post(`/api/day/${MONDAY}/checkin`).expect(200);
-  assert.equal(res.body.day.check_in_at, MONDAY_15H.toISOString());
   const row = await db.get('SELECT snapshot FROM day_records');
   // Ana é do caixa: o bloco da farmácia não entra no dia dela.
   assert.deepEqual(JSON.parse(row.snapshot).sections.map((s) => s.title), ['Abertura', 'Caixa e atendimento', 'Fechamento']);
-  const entrada = allTasks(res.body).find((t) => t.auto === 'check_in');
-  assert.equal(entrada.done, true);
-  assert.equal(res.body.day.points.earned, 10);
-  await agent.post(`/api/day/${MONDAY}/checkin`).expect(409);
+  assert.ok(!allTasks(res.body).some((t) => t.auto && t.auto !== 'close'));
 });
 
-test('marcar as 10 tarefas fecha 100 pontos', async () => {
+test('não há mais registro de entrada e saída', async () => {
+  const { app } = await makeApp();
+  const agent = await employeeAgent(app, request);
+  await agent.post(`/api/day/${MONDAY}/checkin`).expect(404);
+  await agent.post(`/api/day/${MONDAY}/checkout`).expect(404);
+  const m = request.agent(app);
+  await m.post('/api/auth/login/password').send(MANAGER).expect(200);
+  await m.get('/api/manager/nfc').expect(404);
+});
+
+test('dia aberto antes da mudança, ainda vazio, perde entrada e saída', async () => {
+  const { app, db } = await makeApp();
+  const agent = await employeeAgent(app, request);
+  await agent.get(`/api/day/${MONDAY}`).expect(200);
+  // Simula o snapshot antigo, com as tarefas de ponto.
+  const day = await db.get('SELECT * FROM day_records');
+  const old = JSON.parse(day.snapshot);
+  old.sections[0].tasks.unshift({ id: 9001, text: 'Bater ponto de entrada', points: 10, auto: 'check_in' });
+  await db.run('UPDATE day_records SET snapshot = ? WHERE id = ?', [JSON.stringify(old), day.id]);
+  const res = await agent.get(`/api/day/${MONDAY}`).expect(200);
+  assert.ok(!allTasks(res.body).some((t) => t.auto === 'check_in'));
+  assert.equal(res.body.day.points.max, 100);
+});
+
+test('marcar as 8 tarefas e fechar o dia dá 100 pontos', async () => {
   const { app, clock } = await makeApp();
   const agent = await employeeAgent(app, request);
-  let res = await agent.post(`/api/day/${MONDAY}/checkin`).expect(200);
+  let res = await agent.get(`/api/day/${MONDAY}`).expect(200);
   for (const task of allTasks(res.body).filter((t) => !t.auto)) {
     if (task.requires_photo) {
       await agent
@@ -210,12 +227,11 @@ test('marcar as 10 tarefas fecha 100 pontos', async () => {
     }
   }
   clock.now = new Date('2026-10-26T22:05:00Z'); // 18:05 em Manaus
-  res = await agent.post(`/api/day/${MONDAY}/checkout`).expect(200);
-  assert.equal(res.body.day.late_checkout, false);
+  res = await agent.get(`/api/day/${MONDAY}`).expect(200);
   assert.equal(res.body.day.points.earned, 90);
 
   res = await agent.post(`/api/day/${MONDAY}/close`).expect(200);
-  assert.deepEqual(res.body.day.points, { earned: 100, max: 100, done: 10, total: 10, meta: 100 });
+  assert.deepEqual(res.body.day.points, { earned: 100, max: 100, done: 8, total: 8, meta: 100 });
   assert.equal(res.body.editable, false);
 
   const task = allTasks(res.body).find((t) => !t.auto);
@@ -224,13 +240,13 @@ test('marcar as 10 tarefas fecha 100 pontos', async () => {
   assert.equal(frozen.body.error, 'day_closed');
 });
 
-test('fechar o dia exige a saída registrada', async () => {
+test('fechar o dia não depende de entrada nem saída', async () => {
   const { app } = await makeApp();
   const agent = await employeeAgent(app, request);
-  await agent.post(`/api/day/${MONDAY}/checkin`).expect(200);
-  const res = await agent.post(`/api/day/${MONDAY}/close`);
-  assert.equal(res.status, 409);
-  assert.equal(res.body.error, 'not_checked_out');
+  const res = await agent.post(`/api/day/${MONDAY}/close`).expect(200);
+  assert.ok(res.body.day.closed_at);
+  assert.equal(res.body.day.points.earned, 10);
+  await agent.post(`/api/day/${MONDAY}/close`).expect(409);
 });
 
 test('desmarcar tira os pontos; tarefa automática não aceita marcação manual', async () => {
@@ -243,7 +259,7 @@ test('desmarcar tira os pontos; tarefa automática não aceita marcação manual
   res = await agent.delete(`/api/day/${MONDAY}/tasks/${caixa.id}`).expect(200);
   assert.equal(res.body.day.points.earned, 0);
 
-  const auto = allTasks(day.body).find((t) => t.auto === 'check_in');
+  const auto = allTasks(day.body).find((t) => t.auto === 'close');
   const blocked = await agent.put(`/api/day/${MONDAY}/tasks/${auto.id}`);
   assert.equal(blocked.status, 409);
   assert.equal(blocked.body.error, 'auto_task');
@@ -252,20 +268,10 @@ test('desmarcar tira os pontos; tarefa automática não aceita marcação manual
   await agent.put(`/api/day/${MONDAY}/tasks/abc`).expect(400);
 });
 
-test('saída depois de 18h10 é sinalizada', async () => {
-  const { app, clock } = await makeApp();
-  const agent = await employeeAgent(app, request);
-  await agent.post(`/api/day/${MONDAY}/checkout`).expect(409); // sem entrada
-  await agent.post(`/api/day/${MONDAY}/checkin`).expect(200);
-  clock.now = new Date('2026-10-26T22:11:00Z'); // 18:11
-  const res = await agent.post(`/api/day/${MONDAY}/checkout`).expect(200);
-  assert.equal(res.body.day.late_checkout, true);
-});
-
 test('dia anterior é imutável e data inválida é recusada', async () => {
   const { app, clock } = await makeApp();
   const agent = await employeeAgent(app, request);
-  const day = await agent.post(`/api/day/${MONDAY}/checkin`).expect(200);
+  const day = await agent.get(`/api/day/${MONDAY}`).expect(200);
   const task = allTasks(day.body).find((t) => !t.auto);
   await agent.put(`/api/day/${MONDAY}/tasks/${task.id}`).expect(200);
 
@@ -275,7 +281,7 @@ test('dia anterior é imutável e data inválida é recusada', async () => {
   assert.equal(res.body.error, 'not_today');
   const past = await agent.get(`/api/day/${MONDAY}`).expect(200);
   assert.equal(past.body.editable, false);
-  assert.equal(past.body.day.points.earned, 15);
+  assert.equal(past.body.day.points.earned, 10);
 
   await agent.get('/api/day/2026-13-01').expect(400);
 });
@@ -286,7 +292,7 @@ test('domingo não tem expediente', async () => {
   const res = await agent.get('/api/day/2026-10-25').expect(200);
   assert.equal(res.body.workday, false);
   assert.equal(res.body.day, null);
-  const blocked = await agent.post('/api/day/2026-10-25/checkin');
+  const blocked = await agent.post('/api/day/2026-10-25/close');
   assert.equal(blocked.status, 409);
   assert.equal(blocked.body.error, 'no_workday');
   assert.equal((await db.get('SELECT COUNT(*) AS n FROM day_records')).n, 0);
@@ -295,7 +301,8 @@ test('domingo não tem expediente', async () => {
 test('gestora vê o dia da funcionária, mas não registra', async () => {
   const { app } = await makeApp();
   const employee = await employeeAgent(app, request);
-  await employee.post(`/api/day/${MONDAY}/checkin`).expect(200);
+  const day = await employee.get(`/api/day/${MONDAY}`).expect(200);
+  await employee.put(`/api/day/${MONDAY}/tasks/${allTasks(day.body)[0].id}`).expect(200);
 
   const manager = request.agent(app);
   await manager.post('/api/auth/login/password').send(MANAGER).expect(200);
@@ -303,7 +310,7 @@ test('gestora vê o dia da funcionária, mas não registra', async () => {
   assert.equal(res.body.employee.name, 'Ana');
   assert.equal(res.body.editable, false);
   assert.equal(res.body.day.points.earned, 10);
-  await manager.post(`/api/day/${MONDAY}/checkout`).expect(403);
+  await manager.post(`/api/day/${MONDAY}/close`).expect(403);
 });
 
 // ---------- Fase 3: fotos e fechamento ----------
@@ -354,7 +361,7 @@ test('foto marca a tarefa, fica fora da pasta pública e só sai com sessão', a
   const marked = allTasks(res.body).find((t) => t.id === task.id);
   assert.equal(marked.done, true);
   assert.equal(marked.has_photo, true);
-  assert.equal(res.body.day.points.earned, 10);
+  assert.equal(res.body.day.points.earned, 15);
 
   const files = fs.readdirSync(path.join(uploadsDir, '2026-10'));
   assert.equal(files.length, 1);
@@ -381,15 +388,16 @@ test('foto marca a tarefa, fica fora da pasta pública e só sai com sessão', a
 test('fechamento traz resumo e link do WhatsApp', async () => {
   const { app, clock } = await makeApp();
   const agent = await employeeAgent(app, request);
-  await agent.post(`/api/day/${MONDAY}/checkin`).expect(200);
+  const day = await agent.get(`/api/day/${MONDAY}`).expect(200);
+  const caixa = allTasks(day.body).find((t) => t.text.startsWith('Conferir caixa'));
+  await agent.put(`/api/day/${MONDAY}/tasks/${caixa.id}`).expect(200);
   clock.now = new Date('2026-10-26T22:20:00Z'); // 18:20
-  await agent.post(`/api/day/${MONDAY}/checkout`).expect(200);
   const res = await agent.post(`/api/day/${MONDAY}/close`).expect(200);
   const { text, whatsapp_url: url } = res.body.summary;
   assert.match(text, /Ana · 26\/10\/2026/);
-  assert.match(text, /Entrada: 15:00/);
-  assert.match(text, /Saída: 18:20 \(depois da tolerância\)/);
-  assert.match(text, /Pontos: 30 de 100/);
+  assert.match(text, /Dia fechado às 18:20/);
+  assert.doesNotMatch(text, /Entrada|Saída/);
+  assert.match(text, /Pontos: 20 de 100/);
   assert.match(text, /Não cumpridas:\n- Abrir a loja/);
   assert.ok(url.startsWith('https://wa.me/?text='));
   assert.equal(decodeURIComponent(url.slice('https://wa.me/?text='.length)), text);

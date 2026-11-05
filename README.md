@@ -1,7 +1,7 @@
 # Checkpoint Drogaria
 
 Sistema de tarefas e desempenho da equipe da **Drogaria Bem Popular**. Cada um dos dois funcionários entra
-pelo celular com o próprio PIN, bate o ponto e marca as tarefas que são dele (com foto quando a tarefa pede).
+pelo celular com o próprio PIN, marca as tarefas que são dele (com foto quando a tarefa pede).
 A gerência distribui as tarefas, acompanha o dia de cada um em tempo real e compara o desempenho dos dois
 no painel. Escopo e decisões em [`SPEC.md`](SPEC.md).
 
@@ -12,7 +12,7 @@ dois funcionários e tarefas com responsável.
 
 - **Tarefas com responsável.** Em Gestão → Tarefas, cada tarefa do checklist de cada dia da semana tem um
   responsável: um dos funcionários ou "Todos". O dia de cada pessoa mostra só as tarefas dela e as de todos.
-  Entrada, saída e fechamento do dia são sempre de todos (cada um registra o seu). Os botões "Ver tarefas de"
+  "Fechar o dia" é sempre de todos (cada um fecha o seu). O app não registra entrada nem saída. Os botões "Ver tarefas de"
   filtram o editor por pessoa, e a tarefa nova adicionada com uma pessoa escolhida já nasce dela.
 - **Checklist por função.** O padrão já vem dividido: o primeiro funcionário (Jaqueline) cuida de caixa e
   atendimento; o segundo (Bruno), farmacêutico, da geladeira, receitas e controlados, validade, recebimento e
@@ -88,7 +88,7 @@ Abra `http://localhost:3000`. Para testar no celular, use `http://IP-DA-MAQUINA:
 - os dois funcionários, com PINs iniciais `1234` e `5678` e troca obrigatória no primeiro acesso
   (o login é só pelo PIN, por isso os PINs nunca se repetem);
 - as configurações padrão (meta 100 por pessoa, turno 08:00–18:00, expediente de segunda a sábado);
-- o checklist padrão de 16 tarefas para cada dia da semana, já dividido por função: 100 pontos para cada
+- o checklist padrão de 14 tarefas para cada dia da semana, já dividido por função: 100 pontos para cada
   funcionário (o primeiro com caixa e atendimento; o segundo, farmacêutico, com a farmácia).
 
 Pode rodar de novo sem perder nada: o que já existe não é sobrescrito. A única exceção é um banco criado pela
@@ -112,12 +112,6 @@ use `npm run migrate`.
 | `npm run restore -- arquivo.json` | Restaura um backup JSON num banco vazio. |
 | `npm test` | Testes (`node:test` + `supertest`). |
 | `npm run lint` | ESLint. |
-
-## Ponto pela etiqueta NFC
-
-Em **Gestão → Ajustes → Etiqueta NFC do ponto** aparece o link para gravar numa etiqueta NFC comum (com o app gratuito NFC Tools: Escrever → Adicionar registro → URL). Encostar o celular na etiqueta abre o app: a entrada de quem está logado é registrada na hora e a saída pede confirmação. Depois de testar, ligue **"Exigir a etiqueta para registrar entrada e saída"**: a partir daí o botão comum deixa de valer. "Gerar novo código" invalida a etiqueta antiga. Detalhes em `SPEC.md`, seção 8.
-
-O link da etiqueta usa o domínio em que a gerência abriu o app. Em produção, gere e grave o link já pelo endereço `https://` definitivo.
 
 ## Exportação e backup pelo app
 
@@ -160,7 +154,6 @@ plano gratuito) e as fotos no **Vercel Blob**. O repositório já traz `vercel.j
    funciona.
 5. **Redeploy.** Em Deployments, refaça o último deploy para ele ler as variáveis novas. Se faltar alguma, as rotas
    `/api` respondem `server_not_configured` e o log da função diz qual.
-6. **Etiqueta NFC.** Grave o link só depois, a partir de Ajustes, já no domínio final `https://...vercel.app`.
 
 Observações: cada foto chega comprimida (cerca de 300 KB), bem abaixo do limite de 4,5 MB por requisição da Vercel.
 O limite de tentativas de login é contado por instância da função. O backup JSON do app continua valendo; as

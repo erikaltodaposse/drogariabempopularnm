@@ -1,6 +1,6 @@
 // Validação das entradas da gestora. Cada função devolve { value } ou { error } com mensagem em português.
 
-const AUTO_KINDS = ['check_in', 'check_out', 'close'];
+const AUTO_KINDS = ['close'];
 const HHMM_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 function text(value, { max, required = true }) {
@@ -46,16 +46,17 @@ export function parseChecklist(body, employeeIds = null) {
         return { error: `O horário da ${where} precisa estar no formato HH:MM.` };
       }
       const auto = t.auto == null || t.auto === '' ? null : t.auto;
+      if (auto === 'check_in' || auto === 'check_out') return { error: 'O registro de entrada e saída saiu do app. Apague esta tarefa.' };
       if (auto !== null && !AUTO_KINDS.includes(auto)) return { error: `Tipo automático inválido na ${where}.` };
-      if (auto && seenAuto.has(auto)) return { error: 'Cada tarefa automática (entrada, saída, fechamento) só pode aparecer uma vez.' };
+      if (auto && seenAuto.has(auto)) return { error: 'A tarefa de fechar o dia só pode aparecer uma vez.' };
       if (auto) seenAuto.add(auto);
       const assignee = t.assignee == null || t.assignee === '' ? null : int(t.assignee, 1, Number.MAX_SAFE_INTEGER);
       if (assignee === null && t.assignee != null && t.assignee !== '') return { error: `Responsável inválido na ${where}.` };
       if (assignee !== null && employeeIds && !employeeIds.includes(assignee)) {
         return { error: `O responsável da ${where} não é um funcionário ativo.` };
       }
-      // Entrada, saída e fechamento valem para todos: cada um bate o próprio ponto.
-      if (auto && assignee !== null) return { error: 'Entrada, saída e fechamento do dia são de todos os funcionários.' };
+      // Fechar o dia vale para todos: cada um fecha o seu.
+      if (auto && assignee !== null) return { error: 'Fechar o dia é de todos os funcionários.' };
       tasks.push({ text: taskText, points, requires_photo: Boolean(t.requires_photo), auto, due_time: dueTime, assignee });
     }
     sections.push({ title, subtitle: subtitle || null, tasks });
@@ -99,10 +100,6 @@ export function parseSettings(body) {
     const v = text(body.nome_loja, { max: 80 });
     if (!v) return { error: 'O nome da loja precisa ter de 1 a 80 caracteres.' };
     out.nome_loja = v;
-  }
-  if ('ponto_exige_nfc' in body) {
-    if (typeof body.ponto_exige_nfc !== 'boolean') return { error: 'Opção da etiqueta inválida.' };
-    out.ponto_exige_nfc = body.ponto_exige_nfc ? '1' : '0';
   }
   if ('dias_expediente' in body) {
     const days = parseWeekdayList(body.dias_expediente);

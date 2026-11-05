@@ -19,7 +19,7 @@ async function pointsFromDb(db) {
 test('resumo do período bate com o banco', async () => {
   const { manager, db } = await scenario();
   const fromDb = await pointsFromDb(db);
-  assert.deepEqual(fromDb.map((r) => r.points), [100, 80, 80, 80, 10]);
+  assert.deepEqual(fromDb.map((r) => r.points), [100, 75, 80, 75, 10]);
 
   const res = await manager.get('/api/manager/summary?from=2026-10-26&to=2026-11-02').expect(200);
   const s = res.body.summary;
@@ -27,16 +27,15 @@ test('resumo do período bate com o banco', async () => {
   const total = closedPeriod.reduce((sum, r) => sum + r.points, 0);
   assert.equal(s.worked_days, 4);
   assert.equal(s.total_points, total);
-  assert.equal(s.total_points, 340);
-  assert.equal(s.adherence, 340 / 400);
+  assert.equal(s.total_points, 330);
+  assert.equal(s.adherence, 330 / 400);
   assert.equal(s.tier.id, 'bronze');
   assert.equal(s.bonus_value, 100);
-  assert.equal(s.average_points, 85);
-  assert.equal(s.late_checkouts, 1);
+  assert.equal(s.average_points, 82.5);
   assert.equal(s.not_closed, 1);
   assert.equal(s.missing_workdays, 2); // quinta 29 e sábado 31
-  assert.deepEqual(s.series.map((d) => d.points), [100, 80, 80, 80]);
-  assert.deepEqual(s.tasks, { done: 34, total: 40 });
+  assert.deepEqual(s.series.map((d) => d.points), [100, 75, 80, 75]);
+  assert.deepEqual(s.tasks, { done: 26, total: 32 });
   assert.ok(s.punctuality.timed > 0);
 });
 
@@ -61,13 +60,13 @@ test('histórico lista os dias com situação, e o filtro de período funciona',
   const all = await manager.get('/api/manager/days').expect(200);
   assert.deepEqual(all.body.days.map((d) => [d.date, d.status, d.points]), [
     ['2026-11-02', 'em_andamento', 10],
-    ['2026-10-30', 'fechado', 80],
+    ['2026-10-30', 'fechado', 75],
     ['2026-10-28', 'sem_fechamento', 80],
-    ['2026-10-27', 'fechado', 80],
+    ['2026-10-27', 'fechado', 75],
     ['2026-10-26', 'fechado', 100],
   ]);
   const wed = all.body.days.find((d) => d.date === '2026-10-28');
-  assert.equal(wed.late_checkout, true);
+  assert.equal(wed.closed_at, null);
   assert.equal(wed.photos, 2);
   assert.equal(wed.photo_tasks, 2);
 

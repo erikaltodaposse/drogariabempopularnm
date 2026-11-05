@@ -2,6 +2,9 @@
 
 export const FOCUS_PLACEHOLDER = '{foco}';
 
+// Tarefas do registro de ponto, que saiu do app. Ficam fora dos dias novos mesmo num checklist antigo.
+export const RETIRED_AUTO = ['check_in', 'check_out'];
+
 /** A tarefa é desta pessoa? Sem responsável (`assignee` nulo), é das duas. */
 export function isAssignedTo(task, userId) {
   return task.assignee == null || userId == null || Number(task.assignee) === Number(userId);
@@ -22,7 +25,7 @@ export function buildSnapshot(template, userId = null) {
     sections: template.sections.map((section) => ({
       title: section.title,
       subtitle: section.subtitle ?? null,
-      tasks: section.tasks.filter((task) => isAssignedTo(task, userId)).map((task) => ({
+      tasks: section.tasks.filter((task) => isAssignedTo(task, userId) && !RETIRED_AUTO.includes(task.auto)).map((task) => ({
         id: task.id,
         text: String(task.text).replaceAll(FOCUS_PLACEHOLDER, focus),
         // Texto original, com {foco}: identifica a mesma tarefa em dias com focos diferentes.

@@ -312,9 +312,6 @@ a.btn { text-decoration: none; }
 }
 
 /* ---------- Ponto pela etiqueta ---------- */
-.nfc-hint { margin: 0; }
-.nfc-confirm { background: var(--brand-100); border-radius: 20px; padding: 14px; }
-.nfc-confirm .big { margin-top: 0; text-align: center; }
 [tabindex="-1"]:focus { outline: none; }
 .check-field input { flex: none; }
 

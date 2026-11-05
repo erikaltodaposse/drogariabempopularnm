@@ -1,6 +1,6 @@
 // Validação das entradas da gestora. Cada função devolve { value } ou { error } com mensagem em português.
 
-const AUTO_KINDS = ['close'];
+const AUTO_KINDS = ['close', 'count'];
 const HHMM_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 function text(value, { max, required = true }) {
@@ -48,7 +48,7 @@ export function parseChecklist(body, employeeIds = null) {
       const auto = t.auto == null || t.auto === '' ? null : t.auto;
       if (auto === 'check_in' || auto === 'check_out') return { error: 'O registro de entrada e saída saiu do app. Apague esta tarefa.' };
       if (auto !== null && !AUTO_KINDS.includes(auto)) return { error: `Tipo automático inválido na ${where}.` };
-      if (auto && seenAuto.has(auto)) return { error: 'A tarefa de fechar o dia só pode aparecer uma vez.' };
+      if (auto === 'close' && seenAuto.has(auto)) return { error: 'A tarefa de fechar o dia só pode aparecer uma vez.' };
       if (auto) seenAuto.add(auto);
       const assignee = t.assignee == null || t.assignee === '' ? null : int(t.assignee, 1, Number.MAX_SAFE_INTEGER);
       if (assignee === null && t.assignee != null && t.assignee !== '') return { error: `Responsável inválido na ${where}.` };
@@ -56,8 +56,10 @@ export function parseChecklist(body, employeeIds = null) {
         return { error: `O responsável da ${where} não é um funcionário ativo.` };
       }
       // Fechar o dia vale para todos: cada um fecha o seu.
-      if (auto && assignee !== null) return { error: 'Fechar o dia é de todos os funcionários.' };
-      tasks.push({ text: taskText, points, requires_photo: Boolean(t.requires_photo), auto, due_time: dueTime, assignee });
+      if (auto === 'close' && assignee !== null) return { error: 'Fechar o dia é de todos os funcionários.' };
+      // A contagem de estoque se marca sozinha ao contar uma parte: não tem como pedir foto.
+      const photo = auto === 'count' ? false : Boolean(t.requires_photo);
+      tasks.push({ text: taskText, points, requires_photo: photo, auto, due_time: dueTime, assignee });
     }
     sections.push({ title, subtitle: subtitle || null, tasks });
   }

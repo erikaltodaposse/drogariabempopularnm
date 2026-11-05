@@ -6,6 +6,7 @@ import { findSnapshotTask } from '../lib/snapshot.js';
 import { getSettings, isWorkday, getDay, ensureDay, markTask, dayView } from '../lib/checklist.js';
 import { ALLOWED_TYPES, MAX_PHOTO_BYTES, sniffImageType } from '../lib/photos.js';
 import { daySummaryText, whatsappLink } from '../lib/summary.js';
+import { hasOpenCount } from './counts.js';
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -60,6 +61,8 @@ async function payload(req, user, date) {
     // Hora atual em Manaus, para a tela marcar o que já passou do horário.
     now_time: timeKey(req.app.locals.now()),
     employee: user ? { id: user.id, name: user.name } : null,
+    // Com contagem em andamento, a tarefa de contagem se marca pelas partes; sem nenhuma, à mão.
+    stock_count_open: await hasOpenCount(db),
     settings: {
       meta: settings.meta,
       turno_inicio: settings.shiftStart,
@@ -141,13 +144,17 @@ export function dayRouter() {
     res.json(await payload(req, req.user, req.params.date));
   }));
 
-  function manualTask(req, res) {
+  async function manualTask(req, res) {
     const task = findSnapshotTask(req.snapshot, req.taskId);
     if (!task) {
       sendError(res, 404, 'task_not_found', 'Esta tarefa não faz parte do checklist de hoje.');
       return null;
     }
-    if (task.auto) {
+    if (task.auto === 'count' && await hasOpenCount(req.app.locals.db)) {
+      sendError(res, 409, 'auto_task', 'Esta tarefa se marca sozinha quando você conta uma parte da contagem.');
+      return null;
+    }
+    if (task.auto && task.auto !== 'count') {
       sendError(res, 409, 'auto_task', 'Esta tarefa é marcada pelo próprio app.');
       return null;
     }
@@ -159,7 +166,7 @@ export function dayRouter() {
   }
 
   router.put('/:date/tasks/:taskId', writable, ah(async (req, res) => {
-    const task = manualTask(req, res);
+    const task = await manualTask(req, res);
     if (!task) return;
     const db = req.app.locals.db;
     if (task.requires_photo && !(await findCheck(db, req.day.id, task.id))?.photo_path) {
@@ -170,7 +177,7 @@ export function dayRouter() {
   }));
 
   router.delete('/:date/tasks/:taskId', writable, ah(async (req, res) => {
-    const task = manualTask(req, res);
+    const task = await manualTask(req, res);
     if (!task) return;
     const db = req.app.locals.db;
     const check = await findCheck(db, req.day.id, task.id);
@@ -183,7 +190,7 @@ export function dayRouter() {
 
   // Enviar a foto marca a tarefa. Uma nova foto substitui a anterior.
   router.post('/:date/tasks/:taskId/photo', writable, receivePhoto, ah(async (req, res) => {
-    const task = manualTask(req, res);
+    const task = await manualTask(req, res);
     if (!task) return;
     const db = req.app.locals.db;
     const { photos } = req.app.locals;

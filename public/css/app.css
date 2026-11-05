@@ -367,6 +367,11 @@ a.btn { text-decoration: none; }
 /* ---------- Contagem de estoque ---------- */
 .counts .card { margin-top: 16px; }
 .count-next { margin: 8px 0 4px; }
+/* Dentro da tarefa de contagem do checklist: as partes ficam recuadas, embaixo da tarefa. */
+.task-count { margin: 0 0 12px 40px; padding-left: 12px; border-left: 3px solid var(--line); }
+.count-card.embedded + .count-card.embedded { margin-top: 12px; }
+.count-card.embedded .sec-head h3 { font-size: 1rem; margin: 0; }
+.task-count .part-note { margin-left: 32px; }
 .tag-next { background: #E3F5E2; color: var(--leaf-700); }
 .part-note { margin: 0 0 12px 40px; font-size: 0.95rem; }
 .part-note label { display: block; font-weight: 700; margin-bottom: 4px; }

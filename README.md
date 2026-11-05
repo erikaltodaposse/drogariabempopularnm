@@ -25,8 +25,10 @@ dois funcionários e tarefas com responsável.
   falhas, histórico com fotos e planilha.
 - **Contagem de estoque.** Em Gestão → Contagens, a gerência cria uma contagem com as partes do estoque (uma por
   linha, na ordem de contagem). Ela aparece no dia dos dois funcionários: cada um marca a parte que terminou e, se
-  parar no meio, anota onde parou. No dia seguinte, quem abrir o app vê "Continue de: …" com a anotação. Guarda só o
-  andamento (não as quantidades) e fecha sozinha quando todas as partes estão contadas.
+  parar no meio, anota onde parou. No dia seguinte, quem abrir o app vê a parte marcada com "Continue daqui" e a
+  anotação. Guarda só o andamento (não as quantidades) e fecha sozinha quando todas as partes estão contadas.
+  Em Gestão → Tarefas, marque "É a contagem de estoque" numa tarefa: as partes aparecem dentro dela e ela se marca
+  sozinha (com os pontos) quando a pessoa conta uma parte no dia.
 - **Equipe.** Em Gestão → Ajustes → Funcionários, a gerência troca o nome de cada um e define um PIN
   provisório quando alguém esquece o seu.
 

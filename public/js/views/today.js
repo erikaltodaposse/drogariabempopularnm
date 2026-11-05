@@ -7,6 +7,7 @@ import { stockCountsSection } from './stock-count.js';
 
 const AUTO_LABEL = {
   close: 'Marcada ao fechar o dia',
+  count: 'Marca sozinha ao contar uma parte',
 };
 
 const LATE_TOLERANCE_MIN = 15;
@@ -98,8 +99,18 @@ export function todayView({ user, date, onLogout }) {
     fileInput.click();
   }
 
-  // Criada uma vez: atualiza sozinha e não pisca quando o resto do dia é redesenhado.
-  const counts = stockCountsSection();
+  // A contagem de estoque é criada uma vez: atualiza sozinha e não pisca quando o resto do dia é redesenhado.
+  // Fica dentro da tarefa de contagem do checklist; quem não tem essa tarefa vê a contagem num cartão à parte.
+  let counts = null;
+  let countsEmbedded = null;
+  function countsSection(embedded) {
+    if (!counts || countsEmbedded !== embedded) {
+      counts = stockCountsSection({ embedded, onChange: () => act(() => api.day(date)) });
+      countsEmbedded = embedded;
+    }
+    return counts;
+  }
+  let countPlaced = false;
   const error = h('p', { class: 'alert alert-error', role: 'alert', hidden: true });
   const body = h('div', { class: 'container' }, h('p', { class: 'boot' }, 'Carregando o dia…'));
   const root = h(
@@ -164,7 +175,9 @@ export function todayView({ user, date, onLogout }) {
   function taskRow(task) {
     const { editable, date: d } = state;
     const id = `task-${task.id}`;
-    const clickable = editable && !task.auto;
+    // Sem contagem em andamento, a tarefa de contagem é marcada à mão como as outras.
+    const countLinked = task.auto === 'count' && state.stock_count_open;
+    const clickable = editable && (!task.auto || (task.auto === 'count' && !countLinked));
     const overdue = editable && isOverdue(task.due_time, task.done, state.now_time);
     const toggle = () => {
       if (!task.done && task.requires_photo) return pickPhoto(task.id);
@@ -177,7 +190,7 @@ export function todayView({ user, date, onLogout }) {
       overdue && h('span', { class: 'tag tag-late' }, 'Atrasada'),
       task.done && task.late && h('span', { class: 'tag tag-late' }, 'Feita com atraso'),
       task.requires_photo && !task.done && h('span', { class: 'tag' }, clickable ? 'Toque para tirar a foto' : 'Exige foto'),
-      task.auto && h('span', { class: 'tag tag-soft' }, AUTO_LABEL[task.auto]),
+      task.auto && (task.auto !== 'count' || countLinked) && h('span', { class: 'tag tag-soft' }, AUTO_LABEL[task.auto]),
       task.done && task.done_at && h('span', { class: 'when' }, `às ${formatTime(task.done_at)}`),
     ];
     const check = h(
@@ -205,7 +218,12 @@ export function todayView({ user, date, onLogout }) {
         clickable && h('button', { type: 'button', class: 'link-btn', onclick: () => pickPhoto(task.id) }, 'Trocar foto'),
       );
     }
-    return h('li', { class: 'task-item' }, check, photo);
+    let parts = null;
+    if (countLinked && !countPlaced) {
+      countPlaced = true;
+      parts = h('div', { class: 'task-count' }, countsSection(true));
+    }
+    return h('li', { class: 'task-item' }, check, photo, parts);
   }
 
   function closeCard() {
@@ -287,13 +305,15 @@ export function todayView({ user, date, onLogout }) {
       return;
     }
     const { day } = state;
+    const hasCountTask = state.stock_count_open && day.sections.some((s) => s.tasks.some((t) => t.auto === 'count'));
+    countPlaced = false;
     fill(
       body,
       error,
       status,
       fileInput,
       shiftCard(),
-      counts,
+      hasCountTask ? null : countsSection(false),
       ...day.sections.map((section, i) =>
         h(
           'section',

@@ -2,8 +2,10 @@
 // os funcionários marcam cada parte contada e anotam onde pararam. Guarda só o andamento, não as quantidades.
 import express from 'express';
 import { ah, requireAuth, requireRole, sendError } from '../http.js';
-import { nowISO } from '../lib/date.js';
+import { nowISO, todayKey } from '../lib/date.js';
 import { logAudit } from '../lib/audit.js';
+import { getSettings, isWorkday, ensureDay, markTask } from '../lib/checklist.js';
+import { snapshotTasks } from '../lib/snapshot.js';
 
 export const MAX_PARTS = 200;
 
@@ -75,6 +77,37 @@ async function syncClosed(db, countId, at) {
   await db.run('UPDATE stock_counts SET closed_at = ? WHERE id = ?', [left === 0 ? at : null, countId]);
 }
 
+/** Há alguma contagem em andamento? Sem nenhuma, a tarefa de contagem do checklist é marcada à mão. */
+export async function hasOpenCount(db) {
+  return Boolean(await db.get('SELECT 1 AS x FROM stock_counts WHERE closed_at IS NULL AND cancelled_at IS NULL LIMIT 1'));
+}
+
+/**
+ * A tarefa "contagem de estoque" do checklist de hoje fica feita enquanto a pessoa tiver contado pelo menos
+ * uma parte hoje. Contar marca; desmarcar a última parte do dia desmarca.
+ */
+async function syncDayTask(req) {
+  const db = req.app.locals.db;
+  const now = req.app.locals.now();
+  const today = todayKey(now);
+  if (!isWorkday(await getSettings(db), today)) return;
+  let day;
+  try {
+    day = await ensureDay(db, req.user.id, today);
+  } catch {
+    return; // sem checklist para hoje: nada a marcar
+  }
+  if (day.closed_at) return;
+  const tasks = snapshotTasks(JSON.parse(day.snapshot)).filter((t) => t.auto === 'count');
+  if (!tasks.length) return;
+  const mine = await db.all('SELECT done_at FROM stock_count_parts WHERE done_by = ? AND done_at IS NOT NULL', [req.user.id]);
+  const countedToday = mine.some((p) => todayKey(new Date(p.done_at)) === today);
+  for (const task of tasks) {
+    if (countedToday) await markTask(db, day.id, task.id, nowISO(now));
+    else await db.run('DELETE FROM task_checks WHERE day_id = ? AND task_id = ?', [day.id, task.id]);
+  }
+}
+
 export function countsRouter() {
   const router = express.Router();
 
@@ -132,6 +165,7 @@ export function countsRouter() {
         at, req.user.id, req.part.id,
       ]);
       await syncClosed(db, req.countId, at);
+      await syncDayTask(req);
     }
     await respond(req, res);
   }));
@@ -140,6 +174,7 @@ export function countsRouter() {
     const db = req.app.locals.db;
     await db.run('UPDATE stock_count_parts SET done_at = NULL, done_by = NULL WHERE id = ?', [req.part.id]);
     await syncClosed(db, req.countId, null);
+    await syncDayTask(req);
     await respond(req, res);
   }));
 

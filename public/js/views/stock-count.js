@@ -8,13 +8,17 @@ function progressBar(done, total) {
   return h('span', { class: 'bar', 'aria-hidden': 'true' }, h('span', { class: 'bar-fill', style: `width:${pct}%` }));
 }
 
-/** Um cartão por contagem em andamento. Recarrega sozinho depois de cada ação. */
-export function stockCountsSection() {
+/**
+ * Uma lista de partes por contagem em andamento. Recarrega sozinha depois de cada ação.
+ * `embedded`: aparece dentro da tarefa de contagem do checklist, sem cartão próprio.
+ * `onChange`: chamado depois de contar ou desmarcar uma parte (a tarefa do dia pode mudar).
+ */
+export function stockCountsSection({ embedded = false, onChange = null } = {}) {
   const root = h('div', { class: 'counts' });
   let pending = false;
   let editingNote = null; // id da parte com o campo "parei aqui" aberto
 
-  async function act(fn, error) {
+  async function act(fn, error, changesDay = false) {
     if (pending) return;
     pending = true;
     showError(error, '');
@@ -22,6 +26,7 @@ export function stockCountsSection() {
       await fn();
       editingNote = null;
       await load();
+      if (changesDay) onChange?.();
     } catch (err) {
       showError(error, err.message);
     } finally {
@@ -47,7 +52,7 @@ export function stockCountsSection() {
         'aria-checked': String(Boolean(part.done_at)),
         onclick: () => {
           if (part.done_at && !window.confirm(`Desmarcar "${part.name}"? Ela volta a ficar por contar.`)) return;
-          act(() => (part.done_at ? api.uncountPart(count.id, part.id) : api.countPart(count.id, part.id)), error);
+          act(() => (part.done_at ? api.uncountPart(count.id, part.id) : api.countPart(count.id, part.id)), error, true);
         },
       },
       h('span', { class: 'box', 'aria-hidden': 'true' }),
@@ -80,18 +85,16 @@ export function stockCountsSection() {
 
   function countCard(count) {
     const error = h('p', { class: 'alert alert-error', role: 'alert', hidden: true });
-    const next = count.parts.find((p) => p.id === count.next_part_id);
     const done = count.parts.filter((p) => p.done_at);
     const todo = count.parts.filter((p) => !p.done_at);
+    // A próxima parte já vem marcada com "Continue daqui" e com o "parou em", então o topo fica só com o andamento.
     return h(
       'section',
-      { class: 'card count-card', 'aria-labelledby': `count-${count.id}` },
+      { class: embedded ? 'count-card embedded' : 'card count-card', 'aria-labelledby': `count-${count.id}` },
       h('div', { class: 'sec-head' },
-        h('h2', { id: `count-${count.id}` }, count.title),
+        h(embedded ? 'h3' : 'h2', { id: `count-${count.id}` }, count.title),
         h('span', { class: 'sec-count', 'aria-label': `${count.done} de ${count.total} partes contadas` }, `${count.done}/${count.total}`)),
-      h('p', { class: 'muted' }, 'Contagem de estoque. Marque cada parte quando terminar; se parar no meio, anote onde.'),
       progressBar(count.done, count.total),
-      next && h('p', { class: 'count-next' }, h('strong', {}, 'Continue de: '), next.name, next.note ? ` (parou em: ${next.note})` : ''),
       error,
       h('ul', { class: 'tasks' }, todo.map((p) => partRow(count, p, error))),
       done.length > 0 && h('details', { class: 'count-done' },

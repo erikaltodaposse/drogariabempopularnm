@@ -69,7 +69,7 @@ Abra `http://localhost:3000`. Para testar no celular, use `http://IP-DA-MAQUINA:
 | `MANAGER_EMAIL` | no seed | E-mail de login da gerência. |
 | `MANAGER_PASSWORD` | no seed | Senha da gerência, mínimo 8 caracteres. |
 | `MANAGER_NAME` | não | Nome exibido da gerência. Padrão `Gerência`. |
-| `EMPLOYEE_1_NAME` | não | Nome do primeiro funcionário. Padrão `Funcionário 1`. |
+| `EMPLOYEE_1_NAME` | não | Nome do primeiro funcionário (Jaqueline). Padrão `Funcionário 1`. |
 | `EMPLOYEE_2_NAME` | não | Nome do segundo funcionário. Padrão `Funcionário 2`. |
 | `TURSO_DATABASE_URL` | na Vercel | Endereço do banco no Turso (`libsql://...`). Em branco, usa o arquivo `DATA_DIR/app.db`. |
 | `TURSO_AUTH_TOKEN` | na Vercel | Token de acesso ao banco do Turso. |

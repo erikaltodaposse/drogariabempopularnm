@@ -5,6 +5,12 @@ import { WEEKDAYS, WEEKDAYS_SHORT, AUTO_LABELS } from '../weekdays.js';
 let uid = 0;
 const nextId = () => `ce-${++uid}`;
 
+// Entrada e saída saíram do app: num checklist antigo, essas tarefas somem ao abrir o editor e saem ao salvar.
+const RETIRED_AUTO = ['check_in', 'check_out'];
+function withoutRetired(checklist) {
+  return { ...checklist, sections: checklist.sections.map((s) => ({ ...s, tasks: s.tasks.filter((t) => !RETIRED_AUTO.includes(t.auto)) })) };
+}
+
 function move(list, index, delta) {
   const target = index + delta;
   if (target < 0 || target >= list.length) return;
@@ -72,7 +78,7 @@ export function checklistEditor({ setGuard }) {
       markDirty();
     });
     return h('div', { class: 'field' }, h('label', { for: select.id }, 'Responsável'), select,
-      task.auto && h('p', { class: 'field-hint' }, 'Entrada, saída e fechamento são de todos: cada um registra o seu.'));
+      task.auto && h('p', { class: 'field-hint' }, 'Fechar o dia é de todos: cada um fecha o seu.'));
   }
 
   const isVisible = (task) => person == null || task.assignee == null || task.assignee === person;
@@ -329,7 +335,7 @@ export function checklistEditor({ setGuard }) {
     try {
       if (!settings) settings = (await api.getSettings()).settings;
       if (!employees.length) employees = (await api.listEmployees()).employees;
-      model = (await api.getChecklist(weekday)).checklist;
+      model = withoutRetired((await api.getChecklist(weekday)).checklist);
       dirty = false;
       render();
     } catch (err) {

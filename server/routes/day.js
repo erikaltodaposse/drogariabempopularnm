@@ -6,7 +6,6 @@ import { findSnapshotTask } from '../lib/snapshot.js';
 import { getSettings, isWorkday, getDay, ensureDay, markTask, dayView } from '../lib/checklist.js';
 import { ALLOWED_TYPES, MAX_PHOTO_BYTES, sniffImageType } from '../lib/photos.js';
 import { daySummaryText, whatsappLink } from '../lib/summary.js';
-import { isNfcRequired, checkNfcToken } from '../lib/nfc.js';
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -66,7 +65,6 @@ async function payload(req, user, date) {
       turno_inicio: settings.shiftStart,
       turno_fim: settings.shiftEnd,
       nome_loja: settings.storeName,
-      nfc_required: settings.raw.ponto_exige_nfc === '1',
     },
     day: view,
     summary: summaryText ? { text: summaryText, whatsapp_url: whatsappLink(summaryText) } : null,
@@ -127,19 +125,6 @@ export function dayRouter() {
     }),
   ];
 
-  // Com a etiqueta exigida, entrada e saída só valem com o código gravado nela. Código enviado errado é sempre recusado.
-  const nfcGate = ah(async (req, res, next) => {
-    const db = req.app.locals.db;
-    const token = req.body?.nfc_token;
-    if (token != null && !(await checkNfcToken(db, token))) {
-      return sendError(res, 409, 'nfc_invalid', 'Esta etiqueta não é a da loja ou foi trocada. Fale com a gerência.');
-    }
-    if (token == null && (await isNfcRequired(db))) {
-      return sendError(res, 409, 'nfc_required', 'Encoste o celular na etiqueta da loja para registrar o ponto.');
-    }
-    next();
-  });
-
   /** Grava o horário no dia e marca a tarefa automática correspondente, numa transação só. */
   async function stamp(req, column, kind) {
     const at = nowISO(req.app.locals.now());
@@ -150,21 +135,8 @@ export function dayRouter() {
     ]);
   }
 
-  router.post('/:date/checkin', writable, nfcGate, ah(async (req, res) => {
-    if (req.day.check_in_at) return sendError(res, 409, 'already_checked_in', 'A entrada já foi registrada.');
-    await stamp(req, 'check_in_at', 'check_in');
-    res.json(await payload(req, req.user, req.params.date));
-  }));
-
-  router.post('/:date/checkout', writable, nfcGate, ah(async (req, res) => {
-    if (!req.day.check_in_at) return sendError(res, 409, 'not_checked_in', 'Registre a entrada antes da saída.');
-    if (req.day.check_out_at) return sendError(res, 409, 'already_checked_out', 'A saída já foi registrada.');
-    await stamp(req, 'check_out_at', 'check_out');
-    res.json(await payload(req, req.user, req.params.date));
-  }));
-
+  // Não há registro de entrada e saída: fechar o dia marca o fim do expediente.
   router.post('/:date/close', writable, ah(async (req, res) => {
-    if (!req.day.check_out_at) return sendError(res, 409, 'not_checked_out', 'Registre a saída antes de fechar o dia.');
     await stamp(req, 'closed_at', 'close');
     res.json(await payload(req, req.user, req.params.date));
   }));

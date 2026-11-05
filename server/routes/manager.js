@@ -3,10 +3,9 @@ import { ah, requireRole, sendError } from '../http.js';
 import { todayKey, isDateKey } from '../lib/date.js';
 import { logAudit } from '../lib/audit.js';
 import { hashSecret, PIN_RE, verifySecret } from '../lib/auth.js';
-import { loadTemplate, createChecklistVersion, getSettings, employeeIds, isLateCheckout } from '../lib/checklist.js';
+import { loadTemplate, createChecklistVersion, getSettings, employeeIds } from '../lib/checklist.js';
 import { loadDayRows, summarize, failureRanking, historyRow, dayStats } from '../lib/report.js';
 import { daysCsv, buildBackup } from '../lib/export.js';
-import { getNfcToken, rotateNfcToken, isNfcRequired } from '../lib/nfc.js';
 import { DEFAULT_CLEANING_FOCUS, defaultSectionsFor } from '../lib/defaults.js';
 import { parseChecklist, parseWeekdayList, parseSettings } from '../lib/validate.js';
 
@@ -40,7 +39,6 @@ async function settingsResponse(db) {
     bonus_base: Number(s.raw.bonus_base) || 0,
     nome_loja: s.storeName,
     dias_expediente: s.workdays,
-    ponto_exige_nfc: s.raw.ponto_exige_nfc === '1',
   };
 }
 
@@ -74,7 +72,6 @@ async function reportQuery(req, res) {
     from: from || null,
     to: to || null,
     today: todayKey(req.app.locals.now()),
-    isLate: (row) => isLateCheckout(row.check_out_at, settings),
   };
 }
 
@@ -108,7 +105,6 @@ export function managerRouter() {
         // Sem data inicial, as faltas contam desde o cadastro da funcionária.
         from: q.from ?? q.employee.created_at.slice(0, 10),
         to: q.to,
-        isLate: q.isLate,
       }),
     });
   }));
@@ -147,7 +143,6 @@ export function managerRouter() {
         workdays: q.settings.workdays,
         from: q.from ?? emp.created_at.slice(0, 10),
         to: q.to,
-        isLate: q.isLate,
       });
       const todayRow = (await loadDayRows(q.db, emp.id, q.today, q.today))[0] ?? null;
       team.push({
@@ -220,7 +215,7 @@ export function managerRouter() {
     const name = `checkpoint-${slug}-${q.from ?? 'inicio'}-a-${q.to ?? q.today}.csv`;
     res.set('Content-Type', 'text/csv; charset=utf-8');
     res.set('Content-Disposition', `attachment; filename="${name}"`);
-    res.send(daysCsv(rows, { employeeName: q.employee.name, meta: q.settings.meta, isLate: q.isLate }));
+    res.send(daysCsv(rows, { employeeName: q.employee.name, meta: q.settings.meta }));
   }));
 
   router.get('/backup.json', ah(async (req, res) => {
@@ -302,20 +297,6 @@ export function managerRouter() {
     await db.run('DELETE FROM sessions WHERE user_id = ?', [id]);
     await logAudit(db, req.user.id, 'manager.remove', { id }, req.app.locals.now());
     res.json({ ok: true });
-  }));
-
-  // ---------- Etiqueta NFC ----------
-
-  router.get('/nfc', ah(async (req, res) => {
-    const db = req.app.locals.db;
-    res.json({ path: `/ponto/${await getNfcToken(db)}`, required: await isNfcRequired(db) });
-  }));
-
-  router.post('/nfc/rotate', ah(async (req, res) => {
-    const db = req.app.locals.db;
-    const token = await rotateNfcToken(db);
-    await logAudit(db, req.user.id, 'nfc.rotate', null, req.app.locals.now());
-    res.json({ path: `/ponto/${token}`, required: await isNfcRequired(db) });
   }));
 
   // ---------- Checklist ----------

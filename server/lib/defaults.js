@@ -9,8 +9,6 @@ export const DEFAULT_SETTINGS = {
   nome_loja: 'Drogaria Bem Popular',
   // Dias da semana com expediente (0 = domingo). A drogaria abre de segunda a sábado.
   dias_expediente: '1,2,3,4,5,6',
-  // Ponto por etiqueta NFC. Desligado até a gestão gravar a etiqueta.
-  ponto_exige_nfc: '0',
 };
 
 // Índice = dia da semana (0 = domingo).
@@ -31,36 +29,35 @@ export const DEFAULT_TEAM_SIZE = 2;
 export const DEFAULT_ROLES = ['Caixa e atendimento', 'Farmacêutico'];
 
 // A tarefa com {foco} recebe o foco de limpeza do dia na hora de montar o snapshot.
-// Cada funcionário soma 100 pontos: 30 das tarefas em comum (entrada, saída, fechar o dia) + 70 das próprias.
+// Cada funcionário soma 100 pontos: 10 de fechar o dia (de todos) + 90 das próprias.
 export const DEFAULT_SECTIONS = [
   {
     title: 'Abertura',
     subtitle: null,
     tasks: [
-      { text: 'Bater ponto de entrada', points: 10, auto: 'check_in', due_time: '08:00' },
-      { text: 'Abrir a loja: portas, luzes, computador e sistema', points: 5, due_time: '08:05', who: 0 },
+      { text: 'Abrir a loja: portas, luzes, computador e sistema', points: 10, due_time: '08:05', who: 0 },
       { text: 'Conferir caixa e troco inicial', points: 10, due_time: '08:15', who: 0 },
-      { text: 'Conferir a geladeira de medicamentos e anotar a temperatura', points: 10, requires_photo: true, due_time: '08:15', who: 1 },
+      { text: 'Conferir a geladeira de medicamentos e anotar a temperatura', points: 15, requires_photo: true, due_time: '08:15', who: 1 },
     ],
   },
   {
     title: 'Caixa e atendimento',
     subtitle: null,
     tasks: [
-      { text: 'Limpeza do foco do dia: {foco}', points: 15, requires_photo: true, due_time: '09:00', who: 0 },
-      { text: 'Organizar gôndolas e vitrine de higiene, beleza e perfumaria', points: 10, requires_photo: true, due_time: '10:00', who: 0 },
+      { text: 'Limpeza do foco do dia: {foco}', points: 20, requires_photo: true, due_time: '09:00', who: 0 },
+      { text: 'Organizar gôndolas e vitrine de higiene, beleza e perfumaria', points: 15, requires_photo: true, due_time: '10:00', who: 0 },
       { text: 'Conferir preços e etiquetas de uma gôndola', points: 10, due_time: '11:00', who: 0 },
-      { text: 'Responder os clientes do WhatsApp e separar encomendas', points: 10, due_time: '16:00', who: 0 },
+      { text: 'Responder os clientes do WhatsApp e separar encomendas', points: 15, due_time: '16:00', who: 0 },
     ],
   },
   {
     title: 'Farmácia',
     subtitle: null,
     tasks: [
-      { text: 'Conferir as receitas retidas e lançar os controlados no SNGPC', points: 15, due_time: '09:00', who: 1 },
-      { text: 'Conferir a validade de uma prateleira e separar vencidos e a vencer', points: 15, requires_photo: true, due_time: '10:00', who: 1 },
+      { text: 'Conferir as receitas retidas e lançar os controlados no SNGPC', points: 20, due_time: '09:00', who: 1 },
+      { text: 'Conferir a validade de uma prateleira e separar vencidos e a vencer', points: 20, requires_photo: true, due_time: '10:00', who: 1 },
       { text: 'Receber mercadorias e conferir com a nota fiscal', points: 10, due_time: '14:00', who: 1 },
-      { text: 'Repor medicamentos e organizar o estoque', points: 10, due_time: '15:00', who: 1 },
+      { text: 'Repor medicamentos e organizar o estoque', points: 15, due_time: '15:00', who: 1 },
       { text: 'Conferir o armário de controlados', points: 10, due_time: '17:30', who: 1 },
     ],
   },
@@ -69,7 +66,6 @@ export const DEFAULT_SECTIONS = [
     subtitle: null,
     tasks: [
       { text: 'Fechamento de caixa e relatório do dia', points: 10, due_time: '17:40', who: 0 },
-      { text: 'Bater ponto de saída', points: 10, auto: 'check_out', due_time: '18:00' },
       { text: 'Fechar o dia no app e enviar o resumo', points: 10, auto: 'close', due_time: '18:05' },
     ],
   },

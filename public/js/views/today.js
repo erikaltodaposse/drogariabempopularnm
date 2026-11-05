@@ -5,8 +5,6 @@ import { header } from './layout.js';
 import { compressPhoto } from '../photo.js';
 
 const AUTO_LABEL = {
-  check_in: 'Marcada ao registrar a entrada',
-  check_out: 'Marcada ao registrar a saída',
   close: 'Marcada ao fechar o dia',
 };
 
@@ -72,11 +70,10 @@ function progressRing(earned, meta) {
   );
 }
 
-export function todayView({ user, date, nfcToken, onLogout }) {
+export function todayView({ user, date, onLogout }) {
   let state = null;
   let pending = false;
   let closing = false;
-  let nfcCheckout = null; // código lido da etiqueta, aguardando confirmação da saída
   let photoTaskId = null;
   const status = h('p', { class: 'status', role: 'status' });
 
@@ -129,27 +126,8 @@ export function todayView({ user, date, nfcToken, onLogout }) {
   }
 
   function shiftCard() {
-    const { day, settings, editable } = state;
+    const { day, settings } = state;
     const p = day.points;
-    let action = null;
-    const tapHint = (what) => h('p', { class: 'notice nfc-hint' }, h('strong', {}, 'Ponto pela etiqueta. '), `Encoste o celular na etiqueta da loja para registrar a ${what}.`);
-    if (editable && nfcCheckout && day.check_in_at && !day.check_out_at) {
-      action = h(
-        'div',
-        { class: 'nfc-confirm', role: 'group', 'aria-labelledby': 'nfc-q' },
-        h('p', { id: 'nfc-q', class: 'big', tabindex: '-1' }, 'Etiqueta lida. Registrar a saída agora?'),
-        h('button', { class: 'btn', type: 'button', onclick: () => { const t = nfcCheckout; nfcCheckout = null; act(() => api.checkOut(date, t)); } }, 'Sim, registrar saída'),
-        h('button', { class: 'btn btn-outline mt', type: 'button', onclick: () => { nfcCheckout = null; render(); } }, 'Agora não'),
-      );
-    } else if (editable && !day.check_in_at) {
-      action = settings.nfc_required
-        ? tapHint('entrada')
-        : h('button', { class: 'btn', type: 'button', onclick: () => act(() => api.checkIn(date)) }, 'Registrar entrada');
-    } else if (editable && !day.check_out_at) {
-      action = settings.nfc_required
-        ? tapHint('saída')
-        : h('button', { class: 'btn btn-outline', type: 'button', onclick: () => act(() => api.checkOut(date)) }, 'Registrar saída');
-    }
     return h(
       'section',
       { class: 'card summary', 'aria-label': 'Resumo do dia' },
@@ -165,16 +143,7 @@ export function todayView({ user, date, nfcToken, onLogout }) {
           h('p', { class: 'muted' }, `Turno das ${settings.turno_inicio} às ${settings.turno_fim}`),
         ),
       ),
-      h(
-        'dl',
-        { class: 'times' },
-        h('div', {}, h('dt', {}, 'Entrada'), h('dd', {}, day.check_in_at ? formatTime(day.check_in_at) : 'Não registrada')),
-        h('div', {}, h('dt', {}, 'Saída'), h('dd', {}, day.check_out_at ? formatTime(day.check_out_at) : 'Não registrada')),
-      ),
-      day.late_checkout &&
-        h('p', { class: 'flag' }, `Saída registrada depois de ${settings.turno_fim} com mais de 10 minutos de tolerância.`),
       goalMessage(p, Boolean(day.closed_at)),
-      action && h('div', { class: 'mt' }, action),
     );
   }
 
@@ -267,8 +236,7 @@ export function todayView({ user, date, nfcToken, onLogout }) {
       );
     }
     if (!editable) return null;
-    const ready = Boolean(day.check_out_at);
-    if (closing && ready) {
+    if (closing) {
       const tasks = day.sections.flatMap((s) => s.tasks);
       const pendingTasks = tasks.filter((t) => !t.done && t.auto !== 'close');
       const closeTask = tasks.find((t) => t.auto === 'close');
@@ -293,38 +261,13 @@ export function todayView({ user, date, nfcToken, onLogout }) {
       'section',
       { class: 'card' },
       h('h2', {}, 'Fechar o dia'),
-      h(
-        'p',
-        { class: 'muted' },
-        ready ? 'Confira o que ficou pendente e envie o resumo para a gerência.' : 'Registre a saída para poder fechar o dia.',
-      ),
+      h('p', { class: 'muted' }, 'No fim do expediente, confira o que ficou pendente e envie o resumo para a gerência.'),
       h(
         'button',
-        { class: 'btn', type: 'button', disabled: !ready, onclick: () => { closing = true; render('close-title'); } },
+        { class: 'btn', type: 'button', onclick: () => { closing = true; render('close-title'); } },
         'Fechar o dia',
       ),
     );
-  }
-
-  // Chegou pelo link da etiqueta: entrada vai direto; saída pede confirmação.
-  async function handleNfc() {
-    if (!nfcToken) return;
-    const token = nfcToken;
-    nfcToken = null;
-    const { day, editable } = state;
-    if (!editable) {
-      status.textContent = state.workday ? 'Etiqueta lida, mas o dia já foi fechado.' : 'Etiqueta lida. Hoje não há expediente.';
-      return;
-    }
-    if (!day.check_in_at) {
-      await act(() => api.checkIn(date, token));
-      if (state.day.check_in_at) status.textContent = `Entrada registrada pela etiqueta às ${formatTime(state.day.check_in_at)}.`;
-    } else if (!day.check_out_at) {
-      nfcCheckout = token;
-      render('nfc-q');
-    } else {
-      status.textContent = 'Etiqueta lida. Entrada e saída de hoje já estão registradas.';
-    }
   }
 
   function render(focusId) {
@@ -376,7 +319,6 @@ export function todayView({ user, date, nfcToken, onLogout }) {
     .then((data) => {
       state = data;
       render();
-      handleNfc();
     })
     .catch((err) => {
       body.replaceChildren(h('section', { class: 'card' }, h('p', { class: 'alert alert-error', role: 'alert' }, err.message)));

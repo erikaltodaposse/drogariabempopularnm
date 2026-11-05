@@ -38,12 +38,12 @@ test('dia com snapshot de 100 continua 100 depois de o template crescer', async 
 
   await createChecklistVersion(db, MONDAY_WD, await bigTemplate(db), MONDAY);
   const template = await loadTemplate(db, MONDAY_WD);
-  assert.equal(snapshotTasks(buildSnapshot(template)).reduce((s, t) => s + t.points, 0), 420);
+  assert.equal(snapshotTasks(buildSnapshot(template)).reduce((s, t) => s + t.points, 0), 440);
   assert.equal(snapshotTasks(buildSnapshot(template, uid)).reduce((s, t) => s + t.points, 0), 350);
 
   const after = await getDay(db, uid, '2026-10-19');
   assert.equal(after.snapshot, day.snapshot);
-  assert.deepEqual(await pointsOf(db, after), { earned: 100, max: 100, done: 10, total: 10 });
+  assert.deepEqual(await pointsOf(db, after), { earned: 100, max: 100, done: 8, total: 8 });
 });
 
 test('editar checklist não altera o dia de hoje já registrado', async () => {

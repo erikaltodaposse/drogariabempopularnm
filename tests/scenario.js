@@ -7,9 +7,9 @@ export const at = (date, hhmm) => new Date(`${date}T${hhmm}:00-04:00`);
 /**
  * Simula um dia inteiro da funcionária, pulando as tarefas cujo texto começa com algum item de `skip`.
  */
-async function workDay(agent, clock, date, { skip = [], checkout = '18:05', close = true } = {}) {
+async function workDay(agent, clock, date, { skip = [], closeAt = '18:05', close = true } = {}) {
   clock.now = at(date, '08:00');
-  let res = await agent.post(`/api/day/${date}/checkin`).expect(200);
+  const res = await agent.get(`/api/day/${date}`).expect(200);
   const tasks = res.body.day.sections.flatMap((s) => s.tasks).filter((t) => !t.auto);
   for (const task of tasks) {
     if (skip.some((prefix) => task.text.startsWith(prefix))) continue;
@@ -19,13 +19,12 @@ async function workDay(agent, clock, date, { skip = [], checkout = '18:05', clos
       await agent.put(`/api/day/${date}/tasks/${task.id}`).expect(200);
     }
   }
-  clock.now = at(date, checkout);
-  await agent.post(`/api/day/${date}/checkout`).expect(200);
+  clock.now = at(date, closeAt);
   if (close) await agent.post(`/api/day/${date}/close`).expect(200);
 }
 
 /**
- * Semana de 26 a 31/10/2026 da Ana (primeira funcionária) com dias completos, falhas, atraso e duas faltas
+ * Semana de 26 a 31/10/2026 da Ana (primeira funcionária) com dias completos, falhas, um dia sem fechar e duas faltas
  * (quinta 29 e sábado 31); segunda 2/11 em andamento.
  */
 export async function scenario() {
@@ -34,13 +33,15 @@ export async function scenario() {
   const employee = await employeeAgent(app, request);
   await workDay(employee, clock, '2026-10-26');
   await workDay(employee, clock, '2026-10-27', { skip: ['Fechamento de caixa', 'Responder os clientes'] });
-  await workDay(employee, clock, '2026-10-28', { skip: ['Fechamento de caixa'], checkout: '18:20', close: false });
+  await workDay(employee, clock, '2026-10-28', { skip: ['Fechamento de caixa'], close: false });
   // Quinta 29: falta, sem registro.
   await workDay(employee, clock, '2026-10-30', { skip: ['Fechamento de caixa', 'Organizar gôndolas'] });
   // Sábado 31: falta, sem registro.
   // Segunda 2/11 em andamento: entra no histórico, não nos números.
   clock.now = at('2026-11-02', '14:00');
-  await employee.post('/api/day/2026-11-02/checkin').expect(200);
+  const nov2 = await employee.get('/api/day/2026-11-02').expect(200);
+  const abrir = nov2.body.day.sections.flatMap((sec) => sec.tasks).find((t) => t.text.startsWith('Abrir a loja'));
+  await employee.put(`/api/day/2026-11-02/tasks/${abrir.id}`).expect(200);
 
   const manager = request.agent(app);
   await manager.post('/api/auth/login/password').send(MANAGER).expect(200);

@@ -92,8 +92,8 @@ export function dashboardView({ today }) {
         fill(live, h('h2', { id: 'live-title' }, 'Hoje'), h('p', { class: 'muted' }, 'Hoje não há expediente.'));
         return;
       }
-      if (!day || (!day.check_in_at && day.points.done === 0)) {
-        fill(live, h('h2', { id: 'live-title' }, 'Hoje'), h('p', { class: 'muted' }, `${name} ainda não registrou a entrada.`));
+      if (!day || (day.points.done === 0 && !day.closed_at)) {
+        fill(live, h('h2', { id: 'live-title' }, 'Hoje'), h('p', { class: 'muted' }, `${name} ainda não marcou nenhuma tarefa hoje.`));
         return;
       }
       fill(
@@ -102,10 +102,8 @@ export function dashboardView({ today }) {
         h('p', { class: 'big' }, `${day.points.earned} de ${day.points.meta} pontos`),
         bar(day.points.earned, day.points.meta),
         h('p', { class: 'muted' },
-          `Entrada ${day.check_in_at ? formatTime(day.check_in_at) : 'não registrada'} · ` +
-          `Saída ${day.check_out_at ? formatTime(day.check_out_at) : 'não registrada'} · ` +
-          `${day.closed_at ? 'dia fechado' : `${day.points.done} de ${day.points.total} tarefas`}`),
-        day.late_checkout && h('p', { class: 'flag' }, 'Saída depois da tolerância de 10 minutos.'),
+          `${day.points.done} de ${day.points.total} tarefas · ` +
+          `${day.closed_at ? `dia fechado às ${formatTime(day.closed_at)}` : 'dia em andamento'}`),
         h('button', { type: 'button', class: 'btn btn-outline mt', onclick: () => openDay(today) }, 'Ver o dia de hoje'),
       );
     } catch (err) {
@@ -154,7 +152,6 @@ export function dashboardView({ today }) {
         tile('Sem registro', String(s.missing_workdays), 'dias de expediente'),
         tile('No horário', s.punctuality?.ratio == null ? '–' : formatPercent(s.punctuality.ratio),
           s.punctuality?.timed ? `${s.punctuality.on_time} de ${s.punctuality.timed} com horário` : 'tarefas com horário'),
-        tile('Saídas após tolerância', String(s.late_checkouts)),
         tile('Não fechados no app', String(s.not_closed)),
         tile('Pontos no período', String(s.total_points)),
       ),
@@ -258,9 +255,8 @@ export function dashboardView({ today }) {
             bar(d.points, data.meta),
             h('span', { class: 'history-meta' },
               STATUS[d.status],
-              d.check_in_at && ` · ${formatTime(d.check_in_at)}–${d.check_out_at ? formatTime(d.check_out_at) : '?'}`,
-              ` · fotos ${d.photos}/${d.photo_tasks}`,
-              d.late_checkout && ' · saída tardia')),
+              d.closed_at && ` · fechado às ${formatTime(d.closed_at)}`,
+              ` · fotos ${d.photos}/${d.photo_tasks}`)),
         ),
       )),
     );
@@ -332,7 +328,7 @@ export function dashboardView({ today }) {
       const td = t.today;
       const todayText = !td
         ? 'Hoje: ainda não abriu o dia.'
-        : `Hoje: ${td.points} de ${data.meta} pontos · ${td.check_in_at ? `entrou ${formatTime(td.check_in_at)}` : 'sem entrada'}${td.check_out_at ? ` · saiu ${formatTime(td.check_out_at)}` : ''}${td.closed_at ? ' · fechado' : ''}`;
+        : `Hoje: ${td.points} de ${data.meta} pontos · ${td.done} de ${td.total} tarefas${td.closed_at ? ` · fechado às ${formatTime(td.closed_at)}` : ''}`;
       const worst = t.failures[0];
       return h('article', { class: 'person', style: `--person:${colorOf(t.employee.id)}` },
         h('div', { class: 'person-head' },
@@ -344,7 +340,6 @@ export function dashboardView({ today }) {
           h('li', {}, `${s.worked_days} ${s.worked_days === 1 ? 'dia trabalhado' : 'dias trabalhados'}, média de ${String(s.average_points).replace('.', ',')} pts`),
           h('li', {}, `${s.tasks.done} de ${s.tasks.total} tarefas feitas`),
           s.missing_workdays > 0 && h('li', {}, `${s.missing_workdays} ${s.missing_workdays === 1 ? 'dia' : 'dias'} sem registro`),
-          s.late_checkouts > 0 && h('li', {}, `${s.late_checkouts} ${s.late_checkouts === 1 ? 'saída' : 'saídas'} depois da tolerância`),
           data.bonus_base > 0 && h('li', {}, `Bônus estimado: ${formatMoney(s.bonus_value)}`),
           worst && h('li', {}, `Mais esquece: ${worst.task} (${worst.missed}×)`)),
       );

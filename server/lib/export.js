@@ -7,7 +7,7 @@ import { schemaVersion } from '../db.js';
 const WEEKDAYS = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'];
 
 export const CSV_HEADER = [
-  'data', 'dia_semana', 'funcionario', 'entrada', 'saida', 'saida_apos_tolerancia', 'fechado_as',
+  'data', 'dia_semana', 'funcionario', 'fechado_as',
   'pontos', 'meta', 'percentual_meta', 'tarefas_cumpridas', 'tarefas_total', 'fotos', 'pendentes',
 ];
 
@@ -21,7 +21,7 @@ const hour = (iso) => (iso ? timeKey(new Date(iso)) : '');
 const brDate = (key) => key.split('-').reverse().join('/');
 
 /** CSV com BOM UTF-8, uma linha por dia. */
-export function daysCsv(rows, { employeeName, meta, isLate }) {
+export function daysCsv(rows, { employeeName, meta }) {
   const lines = [CSV_HEADER.join(';')];
   for (const row of rows) {
     const p = dayStats(row);
@@ -32,9 +32,6 @@ export function daysCsv(rows, { employeeName, meta, isLate }) {
         brDate(row.date),
         WEEKDAYS[weekdayOf(row.date)],
         employeeName,
-        hour(row.check_in_at),
-        hour(row.check_out_at),
-        isLate(row) ? 'sim' : 'não',
         hour(row.closed_at),
         p.earned,
         meta,

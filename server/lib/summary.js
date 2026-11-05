@@ -9,13 +9,11 @@ function shortDate(key) {
 export function daySummaryText({ date, storeName, employeeName, day }) {
   const tasks = day.sections.flatMap((s) => s.tasks);
   const pending = tasks.filter((t) => !t.done);
-  const hour = (iso) => (iso ? timeKey(new Date(iso)) : 'não registrada');
   const lines = [
     `Resumo do dia — ${storeName}`,
     `${employeeName} · ${shortDate(date)}`,
     '',
-    `Entrada: ${hour(day.check_in_at)}`,
-    `Saída: ${hour(day.check_out_at)}${day.late_checkout ? ' (depois da tolerância)' : ''}`,
+    ...(day.closed_at ? [`Dia fechado às ${timeKey(new Date(day.closed_at))}`] : []),
     `Pontos: ${day.points.earned} de ${day.points.meta}`,
     `Tarefas: ${day.points.done} de ${day.points.total}`,
   ];

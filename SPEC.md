@@ -5,15 +5,15 @@ aqui ficam as regras herdadas que continuam valendo e o que mudou para a Drogari
 
 ## 1. Resumo
 
-Aplicação web mobile-first para a Drogaria Bem Popular. Dois funcionários registram ponto, checklist diário com
-fotos e fechamento do dia, cada um no próprio celular e com as próprias tarefas. A gerência
+Aplicação web mobile-first para a Drogaria Bem Popular. Dois funcionários registram o checklist diário com
+fotos e o fechamento do dia, cada um no próprio celular e com as próprias tarefas. A gerência
 distribui as tarefas, confere o dia de cada um e compara o desempenho dos dois.
 
 ## 2. Perfis
 
 | Papel | Entrada | Pode |
 | --- | --- | --- |
-| employee | PIN de 4 a 6 dígitos (único por pessoa) | Próprio dia: check-in, check-out, marcar as próprias tarefas, anexar foto, fechar dia, trocar PIN |
+| employee | PIN de 4 a 6 dígitos (único por pessoa) | Próprio dia: marcar as próprias tarefas, anexar foto, fechar dia, trocar PIN |
 | manager (gerência) | e-mail e senha | Painel da equipe, editor de tarefas com responsável, ajustes, equipe, exportação |
 
 O seed cria dois funcionários, com PINs iniciais `1234` e `5678` e troca obrigatória no primeiro acesso. Até trocar,
@@ -23,7 +23,8 @@ a API só responde `/api/me`, `/api/auth/change-pin` e `/api/auth/logout`.
 
 - **Responsável por tarefa** (`checklist_tasks.assignee`): id de um funcionário ou nulo (todos). O snapshot do dia
   de cada pessoa leva só as tarefas dela e as de todos; blocos que ficam vazios saem do dia dela.
-- Tarefas automáticas (entrada, saída, fechamento) são sempre de todos: cada pessoa bate o próprio ponto.
+- **Sem registro de ponto.** Não há entrada, saída nem etiqueta NFC. A única tarefa automática é "fechar o dia",
+  que é de todos (cada um fecha o seu) e pode ser feita a qualquer hora do dia.
 - **Meta diária por pessoa** (`settings.meta_pontos`, padrão 100). O checklist padrão dá exatamente 100 para cada um.
 - **Sem postagens.** A drogaria não faz postagens: não há roteiro, prompts nem tarefa de postagens. As tabelas
   `posts` e `post_checks` continuam no banco (migrações publicadas não mudam), mas nada as usa.
@@ -45,7 +46,7 @@ desenvolvimento), frontend em HTML, CSS e JS puros sem build, fotos no Vercel Bl
 ## 5. Decisões
 
 1. **Código copiado do Checkpoint Nil** em vez de começar do zero — o Erik pediu "a ideia do projeto da Nil";
-   ponto por NFC, fotos, exportação e backup vêm prontos.
+   fotos, exportação e backup vêm prontos.
 2. **Responsável na própria tarefa do checklist** (migração 4), e não uma tabela de atribuição à parte — o
    checklist já é por dia da semana e versionado; a atribuição segue a mesma versão. O editor filtra por pessoa
    ("Ver tarefas de") e a tarefa nova nasce da pessoa escolhida.
@@ -73,12 +74,16 @@ desenvolvimento), frontend em HTML, CSS e JS puros sem build, fotos no Vercel Bl
 11. **Checklist padrão por função** (pedido do Erik em 05/11): o primeiro funcionário, Jaqueline, é do caixa e
     atendimento (abrir a loja, caixa, limpeza do foco, gôndolas, preços, WhatsApp, fechamento de caixa); o segundo,
     Bruno, é o farmacêutico (geladeira com foto da temperatura, receitas e SNGPC, validade, recebimento, reposição,
-    controlados). 16 tarefas, 100 pontos para cada um. "Restaurar padrão" aceita vários dias de uma vez.
+    controlados). 14 tarefas, 100 pontos para cada um. "Restaurar padrão" aceita vários dias de uma vez.
 12. **Roteiro de postagens removido** (05/11: "eles não fazem postagens"): sai a aba Roteiro, a tarefa de
     postagens, os prompts, o estilo da marca em Ajustes e as rotas `/api/manager/posts` e `/api/day/:date/posts`.
     O seed troca o checklist antigo pelo novo só se nenhum dia tiver sido registrado.
-13. **Removido o ajuste do snapshot antigo da Nil** (`upgradeLegacyDay`) — esta base começa com banco novo.
-14. **Fuso de Manaus mantido** — a confirmar com o Erik.
+13. **Registro de ponto removido** (05/11: "não tem necessidade desse botão de registrar entrada"): saem
+    entrada, saída, etiqueta NFC, saída após a tolerância e as colunas de entrada e saída da planilha. Os pontos das
+    duas tarefas de ponto foram para as tarefas de cada um. Num checklist antigo, as tarefas de ponto ficam fora dos
+    dias novos e somem ao abrir o editor; o dia de hoje ainda vazio é remontado sem elas. As colunas do banco ficam.
+14. **Removido o ajuste do snapshot antigo da Nil** (`upgradeLegacyDay`) — esta base começa com banco novo.
+15. **Fuso de Manaus mantido** — a confirmar com o Erik.
 
 ## 6. Pendências
 

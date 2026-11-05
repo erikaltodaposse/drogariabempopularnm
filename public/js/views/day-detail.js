@@ -58,10 +58,9 @@ export function dayDetail({ date, userId, onBack }) {
         h(
           'dl',
           { class: 'times' },
-          h('div', {}, h('dt', {}, 'Entrada'), h('dd', {}, day.check_in_at ? formatTime(day.check_in_at) : 'Não registrada')),
-          h('div', {}, h('dt', {}, 'Saída'), h('dd', {}, day.check_out_at ? formatTime(day.check_out_at) : 'Não registrada')),
+          h('div', {}, h('dt', {}, 'Primeira tarefa'), h('dd', {}, done.length ? formatTime(done[0].done_at) : 'Nenhuma')),
+          h('div', {}, h('dt', {}, 'Fechamento'), h('dd', {}, day.closed_at ? formatTime(day.closed_at) : 'Não fechado')),
         ),
-        day.late_checkout && h('p', { class: 'flag' }, `Saída depois de ${data.settings.turno_fim} com mais de 10 minutos de tolerância.`),
         timed.length > 0 && h('p', { class: 'muted' }, `No horário: ${onTime} de ${timed.length} tarefas com horário (tolerância de 15 minutos).`),
       ),
       h(

@@ -5,8 +5,7 @@
   "installCommand": "npm ci",
   "outputDirectory": "public",
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api" },
-    { "source": "/ponto/(.*)", "destination": "/index.html" }
+    { "source": "/api/(.*)", "destination": "/api" }
   ],
   "headers": [
     {
@@ -15,10 +14,6 @@
         { "key": "X-Content-Type-Options", "value": "nosniff" },
         { "key": "Referrer-Policy", "value": "same-origin" }
       ]
-    },
-    {
-      "source": "/ponto/(.*)",
-      "headers": [{ "key": "Cache-Control", "value": "no-store" }]
     }
   ],
   "functions": {

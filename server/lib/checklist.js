@@ -1,9 +1,8 @@
 // Acesso ao banco para checklist, configurações e registros do dia.
-import { buildSnapshot, canRewriteSnapshot } from './snapshot.js';
+import { buildSnapshot, canRewriteSnapshot, isDayEmpty, snapshotTasks, RETIRED_AUTO } from './snapshot.js';
 import { dayPoints } from './points.js';
 import { nowISO, weekdayOf, timeKey, minutesOf } from './date.js';
 
-export const CHECKOUT_TOLERANCE_MIN = 10;
 // Tarefa feita mais de 15 minutos depois do horário conta como atrasada. Não perde pontos.
 export const TASK_TOLERANCE_MIN = 15;
 
@@ -110,8 +109,13 @@ export async function getChecks(db, dayId) {
 /** Devolve o registro do dia, criando-o e congelando o snapshot (só com as tarefas desta pessoa) se ainda não existir. */
 export async function ensureDay(db, userId, date) {
   const existing = await getDay(db, userId, date);
-  if (existing) return existing;
+  if (existing && !(await hasRetiredTasks(db, existing))) return existing;
   const template = await loadTemplate(db, weekdayOf(date));
+  if (existing) {
+    // Dia aberto antes de o ponto sair do app e ainda sem nada marcado: regrava sem entrada e saída.
+    await db.run('UPDATE day_records SET snapshot = ? WHERE id = ?', [JSON.stringify(buildSnapshot(template, userId)), existing.id]);
+    return getDay(db, userId, date);
+  }
   if (!template) throw Object.assign(new Error('Não há checklist para este dia da semana.'), { status: 409, code: 'no_checklist' });
   await db.run('INSERT OR IGNORE INTO day_records (user_id, date, snapshot, created_at) VALUES (?, ?, ?, ?)', [
     userId,
@@ -122,14 +126,15 @@ export async function ensureDay(db, userId, date) {
   return getDay(db, userId, date);
 }
 
-export async function markTask(db, dayId, taskId, at = nowISO()) {
-  await db.run('INSERT OR IGNORE INTO task_checks (day_id, task_id, done_at) VALUES (?, ?, ?)', [dayId, taskId, at]);
+async function hasRetiredTasks(db, day) {
+  if (day.closed_at) return false;
+  const snapshot = JSON.parse(day.snapshot);
+  if (!snapshotTasks(snapshot).some((t) => RETIRED_AUTO.includes(t.auto))) return false;
+  return isDayEmpty(day, await getChecks(db, day.id));
 }
 
-/** Saída depois do fim do turno + tolerância. */
-export function isLateCheckout(checkOutAt, settings) {
-  if (!checkOutAt) return false;
-  return minutesOf(timeKey(new Date(checkOutAt))) > minutesOf(settings.shiftEnd) + CHECKOUT_TOLERANCE_MIN;
+export async function markTask(db, dayId, taskId, at = nowISO()) {
+  await db.run('INSERT OR IGNORE INTO task_checks (day_id, task_id, done_at) VALUES (?, ?, ?)', [dayId, taskId, at]);
 }
 
 /** Feita mais de TASK_TOLERANCE_MIN minutos depois do horário previsto. */
@@ -146,10 +151,7 @@ export async function dayView(db, day, settings) {
   return {
     id: day.id,
     date: day.date,
-    check_in_at: day.check_in_at,
-    check_out_at: day.check_out_at,
     closed_at: day.closed_at,
-    late_checkout: isLateCheckout(day.check_out_at, settings),
     cleaning_focus: snapshot.cleaning_focus,
     sections: snapshot.sections.map((section) => ({
       title: section.title,

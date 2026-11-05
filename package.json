@@ -1,0 +1,37 @@
+{
+  "name": "checkpoint-drogaria",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Tarefas e desempenho da equipe da Drogaria Bem Popular",
+  "type": "module",
+  "main": "server/index.js",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "nodemon --watch server --ext js server/index.js",
+    "seed": "node server/seed.js",
+    "migrate": "node server/db.js",
+    "test": "node --test",
+    "lint": "eslint .",
+    "restore": "node server/restore.js"
+  },
+  "dependencies": {
+    "@libsql/client": "^0.15.15",
+    "@vercel/blob": "^2.8.2",
+    "bcryptjs": "^3.0.3",
+    "cookie-parser": "^1.4.7",
+    "dotenv": "^18.0.9",
+    "express": "^4.22.3",
+    "express-rate-limit": "^8.7.1",
+    "multer": "^2.5.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.13.0",
+    "globals": "^17.13.0",
+    "nodemon": "^3.1.14",
+    "supertest": "^7.3.1"
+  }
+}

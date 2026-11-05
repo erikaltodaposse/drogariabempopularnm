@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" role="img" aria-label="Drogaria Bem Popular">
+  <!-- Logo provisória: cruz de farmácia em verde com destaque amarelo. Troque pela logo oficial da drogaria. -->
+  <circle cx="60" cy="60" r="60" fill="#FFFFFF"/>
+  <circle cx="60" cy="60" r="52" fill="#0F8A47"/>
+  <path d="M48 24h24a4 4 0 0 1 4 4v20h20a4 4 0 0 1 4 4v24a4 4 0 0 1-4 4H76v20a4 4 0 0 1-4 4H48a4 4 0 0 1-4-4V80H24a4 4 0 0 1-4-4V52a4 4 0 0 1 4-4h20V28a4 4 0 0 1 4-4z" fill="#FFFFFF"/>
+  <circle cx="60" cy="64" r="11" fill="#FFC72C"/>
+  <path d="M60 58.5c-2.6-3.6-8-2.4-8 1.7 0 3.6 4.3 6.3 8 9.3 3.7-3 8-5.7 8-9.3 0-4.1-5.4-5.3-8-1.7z" fill="#0F8A47"/>
+</svg>

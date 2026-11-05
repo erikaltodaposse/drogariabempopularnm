@@ -62,11 +62,11 @@ desenvolvimento), frontend em HTML, CSS e JS puros sem build, fotos no Vercel Bl
    Cada pessoa tem uma cor, sempre acompanhada do nome.
 9. **Equipe em Ajustes**: renomear (`PUT /api/manager/employees/:id`) e PIN provisório
    (`POST /api/manager/employees/:id/reset-pin`), que obriga a troca e derruba as sessões abertas.
-10. **Cores da logo enviada pelo Erik (05/11)**: vermelho `#D90000` no cabeçalho, botões e abas; verde `#4CB848`/
-    `#2E7D32` para o que foi feito (tarefa marcada, barras, anel de pontos), já que vermelho em progresso leria como
-    erro; amarelo `#FFC20E` na faixa do cabeçalho; azul `#1E3A8A` como cor de uma pessoa no comparativo. A logo
-    completa fica na tela de entrada; o ícone (cabeçalho e navegador) é a cruz da logo em SVG. O fundo vermelho da
-    logo é opcional (palavra do Erik): nas telas internas o fundo é branco-creme. Fonte cursiva da Nil removida.
+10. **Cores da logo oficial (enviada pelo Erik em 05/11, fundo branco)**: vermelho `#E00000` no cabeçalho, botões e
+    abas; verde `#1FA51C`/`#037D02` para o que foi feito (tarefa marcada, barras, anel de pontos), já que vermelho em
+    progresso leria como erro; amarelo `#FEDF03` na faixa do cabeçalho; azul `#0028AE` como cor de uma pessoa no
+    comparativo; texto quase preto, como o "POPULAR BRASIL" da logo. A logo completa fica num cartão branco na tela
+    de entrada; o ícone (cabeçalho e navegador) é a cruz da logo em SVG. Fonte cursiva da Nil removida.
 11. **Checklist padrão de drogaria**: abertura e caixa, geladeira de medicamentos com foto da temperatura, limpeza
     do foco, gôndolas, reposição, validade, recebimento, WhatsApp, postagens e fechamento.
 12. **Prompts do roteiro com regra de propaganda de farmácia**: não citar medicamento com tarja, não prometer cura,
